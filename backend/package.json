@@ -1,0 +1,35 @@
+{
+  "name": "backend",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "format:check": "prettier . --cache --check --ignore-path .gitignore",
+    "lint:check": "eslint **/*.{js,ts} --concurrency auto --cache --cache-location node_modules/.cache/.eslintcache",
+    "type:check": "tsc --noEmit",
+    "unused:check": "tsr 'src/index.ts$' -p tsconfig.json",
+    "checkall": "npm run unused:check && npm run format:check && npm run lint:check && npm run type:check",
+    "fix": "prettier . --cache --write --log-level warn --ignore-path .gitignore; npm run lint:check -- --fix;",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.6",
+    "hono": "^4.10.4"
+  },
+  "devDependencies": {
+    "@stylistic/eslint-plugin": "^5.5.0",
+    "@types/node": "^20.11.17",
+    "eslint": "^9.39.1",
+    "eslint-config-flat-gitignore": "^2.1.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-import-x": "^4.16.1",
+    "eslint-plugin-jsdoc": "^61.1.12",
+    "eslint-plugin-unicorn": "^62.0.0",
+    "prettier": "^3.6.2",
+    "tsr": "^1.3.4",
+    "tsx": "^4.7.1",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.46.3"
+  }
+}
