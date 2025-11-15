@@ -3,6 +3,7 @@
 Kiro-style Spec Driven Development implementation on AI-DLC (AI Development Life Cycle)
 
 ## Project Memory
+
 Project memory keeps persistent guidance (steering, specs notes, component docs) so Codex honors your standards each run. Treat it as the long-lived source of truth for patterns, conventions, and decisions.
 
 - Use `.kiro/steering/` for project-wide policies: architecture principles, naming schemes, security constraints, tech stack decisions, api standards, etc.
@@ -12,6 +13,7 @@ Project memory keeps persistent guidance (steering, specs notes, component docs)
 ## Project Context
 
 ### Paths
+
 - Steering: `.kiro/steering/`
 - Specs: `.kiro/specs/`
 
@@ -21,13 +23,16 @@ Project memory keeps persistent guidance (steering, specs notes, component docs)
 **Specs** (`.kiro/specs/`) - Formalize development process for individual features
 
 ### Active Specifications
+
 - Check `.kiro/specs/` for active specifications
 - Use `/prompts:kiro-spec-status [feature-name]` to check progress
 
 ## Development Guidelines
+
 - Think in English, but generate responses in Japanese (思考は英語、回答の生成は日本語で行うように)
 
 ## Minimal Workflow
+
 - Phase 0 (optional): `/prompts:kiro-steering`, `/prompts:kiro-steering-custom`
 - Phase 1 (Specification):
   - `/prompts:kiro-spec-init "description"`
@@ -41,11 +46,14 @@ Project memory keeps persistent guidance (steering, specs notes, component docs)
 - Progress check: `/prompts:kiro-spec-status {feature}` (use anytime)
 
 ## Development Rules
+
 - 3-phase approval workflow: Requirements → Design → Tasks → Implementation
 - Human review required each phase; use `-y` only for intentional fast-track
 - Keep steering current and verify alignment with `/prompts:kiro-spec-status`
+- クラスや interface は使わずに、関数型プログラミングスタイルで実装すること
 
 ## Steering Configuration
+
 - Load entire `.kiro/steering/` as project memory
 - Default files: `product.md`, `tech.md`, `structure.md`
 - Custom files are supported (managed via `/prompts:kiro-steering-custom`)

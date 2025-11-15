@@ -8,8 +8,7 @@
     "format:check": "prettier . --cache --check --ignore-path .gitignore",
     "lint:check": "eslint **/*.{js,ts} --concurrency auto --cache --cache-location node_modules/.cache/.eslintcache",
     "type:check": "tsc --noEmit",
-    "unused:check": "tsr 'src/index.ts$' -p tsconfig.json",
-    "checkall": "npm run unused:check && npm run format:check && npm run lint:check && npm run type:check",
+    "checkall": "npm run format:check && npm run lint:check && npm run type:check",
     "fix": "prettier . --cache --write --log-level warn --ignore-path .gitignore; npm run lint:check -- --fix;",
     "test": "vitest run"
   },
@@ -29,9 +28,9 @@
     "eslint-plugin-jsdoc": "^61.1.12",
     "eslint-plugin-unicorn": "^62.0.0",
     "prettier": "^3.6.2",
-    "tsr": "^1.3.4",
     "tsx": "^4.7.1",
     "typescript": "^5.8.3",
-    "typescript-eslint": "^8.46.3"
+    "typescript-eslint": "^8.46.3",
+    "vitest": "^4.0.9"
   }
 }

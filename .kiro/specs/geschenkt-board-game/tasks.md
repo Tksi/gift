@@ -1,7 +1,7 @@
 # Implementation Plan
 
 - [ ] 1. ゲームセッション基盤を整備する
-- [ ] 1.1 InMemoryGameStoreとデッキ初期化ルーチンを実装する
+- [x] 1.1 InMemoryGameStoreとデッキ初期化ルーチンを実装する
   - セッションごとの envelope（snapshot, version, eventLog, mutex, processedCommands）を `Map` で保持し、SHA1 版ハッシュを返せるようにする。
   - 3〜35 のカードから9枚を取り除き `discardHidden` に秘匿保存、プレイヤー順序と RNG シードも snapshot へ格納する。
   - セッション終了後も履歴を保持できるよう削除ポリシーを設計し、API からのアクセスに備えた accessor を揃える。

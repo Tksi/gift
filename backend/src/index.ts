@@ -3,6 +3,10 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import { Scalar } from '@scalar/hono-api-reference';
 import { roomsIndexGet } from 'routes/rooms/index.get.js';
 
+export { createInMemoryGameStore } from 'states/inMemoryGameStore.js';
+
+export { createSetupSnapshot } from 'states/setup.js';
+
 const app = new OpenAPIHono();
 
 app.route('/', roomsIndexGet);
