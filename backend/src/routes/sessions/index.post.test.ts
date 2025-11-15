@@ -1,6 +1,7 @@
 import { createApp } from 'app.js';
 import { createInMemoryGameStore } from 'states/inMemoryGameStore.js';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import type { TimerSupervisor } from 'services/timerSupervisor.js';
 import type { GameSnapshot } from 'states/inMemoryGameStore.js';
 
 /**
@@ -8,14 +9,21 @@ import type { GameSnapshot } from 'states/inMemoryGameStore.js';
  */
 const createTestApp = () => {
   const store = createInMemoryGameStore();
+  const timerSupervisor: TimerSupervisor = {
+    register: vi.fn(),
+    clear: vi.fn(),
+    restore: vi.fn(),
+  };
 
   const app = createApp({
     store,
     now: () => '2025-01-01T00:00:00.000Z',
     generateSessionId: () => 'session-test',
+    timerSupervisor,
+    turnTimeoutMs: 30_000,
   });
 
-  return { app, store };
+  return { app, store, timerSupervisor };
 };
 
 type SessionResponse = {
@@ -32,7 +40,7 @@ type ErrorResponse = {
 
 describe('POST /sessions', () => {
   it('公平なセットアップで新規セッションを作成しスナップショットとバージョン情報を返す', async () => {
-    const { app, store } = createTestApp();
+    const { app, store, timerSupervisor } = createTestApp();
 
     const response = await app.request('/sessions', {
       method: 'POST',
@@ -71,6 +79,7 @@ describe('POST /sessions', () => {
     expect(snapshot.turnState.currentPlayerIndex).toBe(0);
     expect(snapshot.turnState.awaitingAction).toBe(true);
     expect(typeof snapshot.turnState.cardInCenter).toBe('number');
+    expect(snapshot.turnState.deadline).toBe('2025-01-01T00:00:30.000Z');
 
     expect(snapshot.players).toEqual([
       { id: 'alice', displayName: 'Alice' },
@@ -103,6 +112,10 @@ describe('POST /sessions', () => {
 
     expect(envelope?.version).toBe(payload.state_version);
     expect(envelope?.snapshot).toEqual(snapshot);
+    expect(timerSupervisor.register).toHaveBeenCalledWith(
+      'session-test',
+      '2025-01-01T00:00:30.000Z',
+    );
   });
 
   it('プレイヤー数が不正な場合は 422 と理由コードを返す', async () => {

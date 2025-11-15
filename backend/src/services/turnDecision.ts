@@ -7,6 +7,10 @@ import {
   placeChipIntoCenter,
 } from 'services/chipLedger.js';
 import { createServiceError } from 'services/errors.js';
+import {
+  type TimerSupervisor,
+  calculateTurnDeadline,
+} from 'services/timerSupervisor.js';
 import type {
   GameSnapshot,
   InMemoryGameStore,
@@ -25,6 +29,8 @@ export type TurnCommandInput = {
 export type TurnDecisionDependencies = {
   store: InMemoryGameStore;
   now: () => string;
+  timerSupervisor: TimerSupervisor;
+  turnTimeoutMs: number;
 };
 
 export type TurnDecisionResult = {
@@ -204,6 +210,20 @@ const applyAction = (snapshot: GameSnapshot, input: TurnCommandInput) => {
   }
 };
 
+const updateTurnDeadline = (
+  snapshot: GameSnapshot,
+  timestamp: string,
+  timeoutMs: number,
+) => {
+  if (snapshot.turnState.awaitingAction) {
+    snapshot.turnState.deadline = calculateTurnDeadline(timestamp, timeoutMs);
+
+    return;
+  }
+
+  snapshot.turnState.deadline = null;
+};
+
 /**
  * ターン進行コマンドを処理するサービスを構築する。
  * @param dependencies ストアやクロックなどの依存性。
@@ -247,10 +267,28 @@ export const createTurnDecisionService = (
         snapshot.phase = 'running';
       }
 
-      snapshot.updatedAt = dependencies.now();
+      const timestamp = dependencies.now();
+      snapshot.updatedAt = timestamp;
+      updateTurnDeadline(snapshot, timestamp, dependencies.turnTimeoutMs);
 
       const saved = dependencies.store.saveSnapshot(snapshot);
       dependencies.store.markCommandProcessed(input.sessionId, input.commandId);
+
+      const next = saved.snapshot.turnState;
+      const nextDeadline = next.deadline;
+
+      if (
+        next.awaitingAction &&
+        nextDeadline !== null &&
+        nextDeadline !== undefined
+      ) {
+        dependencies.timerSupervisor.register(
+          saved.snapshot.sessionId,
+          nextDeadline,
+        );
+      } else {
+        dependencies.timerSupervisor.clear(saved.snapshot.sessionId);
+      }
 
       return {
         snapshot: saved.snapshot,

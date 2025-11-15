@@ -5,6 +5,10 @@ import { registerSessionPostRoute } from 'routes/sessions/index.post.js';
 import { registerSessionActionsPostRoute } from 'routes/sessions/{sessionId}/actions.post.js';
 import { registerSessionGetRoute } from 'routes/sessions/{sessionId}/index.get.js';
 import { registerSessionStateGetRoute } from 'routes/sessions/{sessionId}/state.get.js';
+import {
+  type TimerSupervisor,
+  createTimerSupervisor,
+} from 'services/timerSupervisor.js';
 import { createTurnDecisionService } from 'services/turnDecision.js';
 import { createInMemoryGameStore } from 'states/inMemoryGameStore.js';
 import type { SessionRouteDependencies } from 'routes/sessions/types.js';
@@ -14,6 +18,12 @@ export type CreateAppOptions = {
   store?: InMemoryGameStore;
   now?: () => string;
   generateSessionId?: () => string;
+  timerSupervisor?: TimerSupervisor;
+  turnTimeoutMs?: number;
+};
+
+const noopTimeoutHandler = (): void => {
+  // 強制取得フローは Task 3.2 で実装予定のため、現時点では no-op。
 };
 
 /**
@@ -26,18 +36,34 @@ export const createApp = (options: CreateAppOptions = {}) => {
   const store = options.store ?? createInMemoryGameStore();
   const now = options.now ?? (() => new Date().toISOString());
   const generateSessionId = options.generateSessionId ?? (() => randomUUID());
+  const turnTimeoutMs = options.turnTimeoutMs ?? 45_000;
+  const timerSupervisor =
+    options.timerSupervisor ??
+    createTimerSupervisor({
+      store,
+      now: () => Date.now(),
+      schedule: (handler, delay) => setTimeout(handler, delay),
+      cancel: (handle) => clearTimeout(handle),
+      onTimeout: noopTimeoutHandler,
+    });
 
   const sessionsApp = new OpenAPIHono();
   const turnService = createTurnDecisionService({
     store,
     now,
+    timerSupervisor,
+    turnTimeoutMs,
   });
   const sessionDependencies: SessionRouteDependencies = {
     store,
     now,
     generateSessionId,
     turnService,
+    timerSupervisor,
+    turnTimeoutMs,
   };
+
+  timerSupervisor.restore();
 
   registerSessionPostRoute(sessionsApp, sessionDependencies);
   registerSessionGetRoute(sessionsApp, sessionDependencies);

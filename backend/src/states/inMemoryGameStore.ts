@@ -7,6 +7,8 @@ import type {
 } from 'schema/game.js';
 import type { playerSummarySchema } from 'schema/players.js';
 
+type TimerHandle = ReturnType<typeof setTimeout>;
+
 export type GamePhase = z.infer<typeof gamePhaseSchema>;
 
 export type PlayerSummary = z.infer<typeof playerSummarySchema>;
@@ -35,6 +37,8 @@ export type SessionEnvelope = {
   eventLog: EventLogEntry[];
   processedCommands: Set<string>;
   mutex: Mutex;
+  deadlineHandle?: TimerHandle;
+  deadlineAt?: number;
 };
 
 export type SessionSummary = {

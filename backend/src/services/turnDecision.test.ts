@@ -1,6 +1,7 @@
 import { createTurnDecisionService } from 'services/turnDecision.js';
 import { createInMemoryGameStore } from 'states/inMemoryGameStore.js';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import type { TimerSupervisor } from 'services/timerSupervisor.js';
 import type { GameSnapshot } from 'states/inMemoryGameStore.js';
 
 type SnapshotOverride = Partial<
@@ -50,16 +51,35 @@ const createSnapshot = (override: SnapshotOverride = {}): GameSnapshot => {
   };
 };
 
+const TURN_TIMEOUT_MS = 20_000;
+
+const createTimerSupervisorStub = () => {
+  const register = vi.fn();
+  const clear = vi.fn();
+  const restore = vi.fn();
+
+  const timerSupervisor: TimerSupervisor = {
+    register,
+    clear,
+    restore,
+  };
+
+  return { timerSupervisor, register, clear };
+};
+
 const setupService = (options: { snapshot?: SnapshotOverride } = {}) => {
   const store = createInMemoryGameStore();
   const snapshot = createSnapshot(options.snapshot);
   const envelope = store.saveSnapshot(snapshot);
+  const { timerSupervisor, register, clear } = createTimerSupervisorStub();
   const service = createTurnDecisionService({
     store,
     now: () => '2025-01-01T00:00:10.000Z',
+    timerSupervisor,
+    turnTimeoutMs: TURN_TIMEOUT_MS,
   });
 
-  return { service, store, snapshot, envelope };
+  return { service, store, snapshot, envelope, register, clear };
 };
 
 describe('createTurnDecisionService の挙動', () => {
@@ -81,7 +101,7 @@ describe('createTurnDecisionService の挙動', () => {
   });
 
   it('placeChip で中央ポットを増やし次のプレイヤーへ手番を進める', async () => {
-    const { service, envelope } = setupService();
+    const { service, envelope, register } = setupService();
     const { version } = envelope;
 
     const result = await service.applyCommand({
@@ -98,10 +118,15 @@ describe('createTurnDecisionService の挙動', () => {
     expect(result.snapshot.turnState.currentPlayerIndex).toBe(1);
     expect(result.snapshot.turnState.turn).toBe(1);
     expect(result.snapshot.updatedAt).toBe('2025-01-01T00:00:10.000Z');
+    expect(result.snapshot.turnState.deadline).toBe('2025-01-01T00:00:30.000Z');
+    expect(register).toHaveBeenCalledWith(
+      envelope.snapshot.sessionId,
+      '2025-01-01T00:00:30.000Z',
+    );
   });
 
   it('takeCard でカードとチップを取得し新しいターンを開始する', async () => {
-    const { service, envelope } = setupService({
+    const { service, envelope, register } = setupService({
       snapshot: {
         centralPot: 3,
         chips: { alice: 9, bob: 13 },
@@ -132,6 +157,41 @@ describe('createTurnDecisionService の挙動', () => {
     expect(result.snapshot.turnState.turn).toBe(5);
     expect(result.snapshot.turnState.currentPlayerId).toBe('alice');
     expect(result.snapshot.chips.alice).toBe(12);
+    expect(result.snapshot.turnState.deadline).toBe('2025-01-01T00:00:30.000Z');
+    expect(register).toHaveBeenCalledWith(
+      envelope.snapshot.sessionId,
+      '2025-01-01T00:00:30.000Z',
+    );
+  });
+
+  it('最後のカード取得で締切を解除する', async () => {
+    const { service, envelope, clear } = setupService({
+      snapshot: {
+        centralPot: 1,
+        chips: { alice: 9, bob: 12 },
+        turnState: {
+          turn: 5,
+          currentPlayerId: 'alice',
+          currentPlayerIndex: 0,
+          cardInCenter: 25,
+          awaitingAction: true,
+        },
+        deck: [],
+        hands: { alice: [], bob: [] },
+      },
+    });
+
+    const result = await service.applyCommand({
+      sessionId: envelope.snapshot.sessionId,
+      commandId: 'cmd-final',
+      expectedVersion: envelope.version,
+      playerId: 'alice',
+      action: 'takeCard',
+    });
+
+    expect(result.snapshot.turnState.awaitingAction).toBe(false);
+    expect(result.snapshot.turnState.deadline).toBeNull();
+    expect(clear).toHaveBeenCalledWith(envelope.snapshot.sessionId);
   });
 
   it('同じ commandId を再送すると最新状態をそのまま返す', async () => {

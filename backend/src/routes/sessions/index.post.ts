@@ -8,6 +8,7 @@ import {
   errorResponseSchema,
   sessionResponseSchema,
 } from 'schema/sessions.js';
+import { calculateTurnDeadline } from 'services/timerSupervisor.js';
 import { createSetupSnapshot } from 'states/setup.js';
 import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { SessionRouteDependencies } from 'routes/sessions/types.js';
@@ -196,7 +197,28 @@ export const registerSessionPostRoute = (
         payload.seed,
       );
 
+      if (snapshot.turnState.awaitingAction) {
+        snapshot.turnState.deadline = calculateTurnDeadline(
+          snapshot.updatedAt,
+          dependencies.turnTimeoutMs,
+        );
+      } else {
+        snapshot.turnState.deadline = null;
+      }
+
       const envelope = dependencies.store.saveSnapshot(snapshot);
+
+      const initialDeadline = snapshot.turnState.deadline;
+
+      if (
+        snapshot.turnState.awaitingAction &&
+        initialDeadline !== null &&
+        initialDeadline !== undefined
+      ) {
+        dependencies.timerSupervisor.register(sessionId, initialDeadline);
+      } else {
+        dependencies.timerSupervisor.clear(sessionId);
+      }
 
       return c.json(toSessionResponse(envelope), 201);
     }

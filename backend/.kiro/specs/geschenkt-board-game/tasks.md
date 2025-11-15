@@ -32,7 +32,7 @@
   - _Requirements: 2.4,3.3,3.5,5.1_
 
 - [ ] 3. 強制取得とタイマー監視を実装する
-- [ ] 3.1 TimerSupervisor と締切登録を実装する
+- [x] 3.1 TimerSupervisor と締切登録を実装する
   - セッション開始時・各ターン開始時に `deadline` を setTimeout へ登録し、ハンドルを envelope に保存する。
   - 急終了やキャンセル時には該当タイマーを確実に解除し、復帰時に残り時間から再設定するルーチンを整える。
   - _Requirements: 2.5_
