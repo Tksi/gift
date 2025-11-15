@@ -9,7 +9,7 @@
     "lint:check": "eslint **/*.{js,ts} --concurrency auto --cache --cache-location node_modules/.cache/.eslintcache",
     "type:check": "tsc --noEmit",
     "checkall": "npm run format:check && npm run lint:check && npm run type:check",
-    "fix": "prettier . --cache --write --log-level warn --ignore-path .gitignore; npm run lint:check -- --fix;",
+    "fix": "prettier . --cache --write --log-level warn --ignore-path .gitignore; npm run lint:check -- --fix; npm run type:check",
     "test": "vitest run"
   },
   "dependencies": {
@@ -31,6 +31,7 @@
     "tsx": "^4.7.1",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.46.3",
+    "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^4.0.9"
   }
 }

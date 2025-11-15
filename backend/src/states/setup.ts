@@ -66,7 +66,7 @@ const assertPlayerCount = (playerIds: readonly string[]): void => {
 };
 
 /**
- * Generates the initial deck order, hidden cards, and randomized player order.
+ * 初期デッキ順序や伏せ札、プレイヤー順のシャッフル結果を生成する。
  * @param playerIds プレイヤー ID の配列（2〜7名）。
  * @param options シードなどのオプション。
  */

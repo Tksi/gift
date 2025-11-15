@@ -105,7 +105,7 @@ const ensureEnvelope = (
 };
 
 /**
- * Maintains Geschenkt session envelopes fully in memory for the current process.
+ * 現在のプロセス内で Geschenkt のセッション情報をすべてメモリに保持するストア。
  */
 export const createInMemoryGameStore = (): InMemoryGameStore => {
   const sessions = new Map<string, SessionEnvelope>();

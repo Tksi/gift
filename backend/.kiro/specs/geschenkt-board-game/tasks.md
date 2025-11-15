@@ -1,0 +1,90 @@
+# Implementation Plan
+
+- [ ] 1. ゲームセッション基盤を整備する
+- [x] 1.1 InMemoryGameStoreとデッキ初期化ルーチンを実装する
+  - セッションごとの envelope（snapshot, version, eventLog, mutex, processedCommands）を `Map` で保持し、SHA1 版ハッシュを返せるようにする。
+  - 3〜35 のカードから9枚を取り除き `discardHidden` に秘匿保存、プレイヤー順序と RNG シードも snapshot へ格納する。
+  - セッション終了後も履歴を保持できるよう削除ポリシーを設計し、API からのアクセスに備えた accessor を揃える。
+  - _Requirements: 1.1,1.4,1.5,4.5_
+- [x] 1.2 セットアップ/参加 HTTP エンドポイントを実装する
+  - `POST /sessions` でプレイヤー定義を受け取り、2〜7 名検証と 11 チップ配布を行い、UI 表示用の初期状態を返す。
+  - 既存セッションへの参加取得やステータス確認 API を揃え、`state_version` をレスポンスに含める。
+  - バリデーション失敗時は 422 で理由コードを返し、セットアップをロールバックして一貫性を保つ。
+  - _Requirements: 1.2,1.3,1.4,5.3_
+- [ ] 1.3 ステート取得と ETag 連携を仕上げる
+  - `GET /sessions/:id/state` に最新 snapshot と `state_version` を返却し、Last-Event-ID からの再同期にも利用できるようにする。
+  - セッションが存在しない場合の 404、アクセス権違反時の 403 など標準エラーを設計する。
+  - _Requirements: 1.4,5.1,5.3_
+
+- [ ] 2. ターン進行とチップ管理のサービス群を実装する
+- [ ] 2.1 TurnDecisionService で行動適用と冪等性を実現する
+  - `commandId` と `stateVersion` を検証し、競合時は 409 を返して最新状態取得を促す。
+  - カード公開→アクション選択→ターン移動の一連フローを snapshot へ適用し、エラー時は直前の状態へロールバックする。
+  - _Requirements: 2.1,2.2,2.3,5.3_
+- [ ] 2.2 ChipLedger と中央チップ処理を実装する
+  - 所持チップが 0 の場合は `takeCard` のみ許容するなどルール制約を実装し、残量を常時更新する。
+  - カード取得時に中央チップをプレイヤーへ移し、通知ペイロードを生成する。
+  - 不足支払い試行時は専用エラーコード `CHIP_INSUFFICIENT` を返し再入力を促す。
+  - _Requirements: 3.1,3.2,3.4_
+- [ ] 2.3 アクション API とレスポンス整形を実装する
+  - `POST /sessions/:id/actions` で turn service を呼び出し、成功時の新状態とログ、失敗時の理由を統一フォーマットで返す。
+  - 中央列カードや累積チップなど UI で必要な情報をレスポンスに含め、チップ残数変化を全プレイヤーへ共有する。
+  - _Requirements: 2.4,3.3,3.5,5.1_
+
+- [ ] 3. 強制取得とタイマー監視を実装する
+- [ ] 3.1 TimerSupervisor と締切登録を実装する
+  - セッション開始時・各ターン開始時に `deadline` を setTimeout へ登録し、ハンドルを envelope に保存する。
+  - 急終了やキャンセル時には該当タイマーを確実に解除し、復帰時に残り時間から再設定するルーチンを整える。
+  - _Requirements: 2.5_
+- [ ] 3.2 システム強制取得フローを統合する
+  - タイムアウト時に `playerId = system` のコマンドを TurnDecisionService へ注入し、ログ/通知でも自動行動であることを示す。
+  - 次ターン開始や SSE 通知を通常フローと同じ経路で行い、観戦者にも強制取得を伝播する。
+  - _Requirements: 2.5,5.2_
+
+- [ ] 4. 終局処理と結果エクスポートを実装する
+- [ ] 4.1 ScoreService で終局計算を行う
+  - 連番グループ化と最小値スコア算出ロジックを実装し、同点時のチップ差し引きで順位を決める。
+  - 最終結果を snapshot とログへ記録し、`state.final` SSE イベントを生成する。
+  - _Requirements: 4.1,4.2,4.3,4.4_
+- [ ] 4.2 ResultExportService と履歴 API を実装する
+  - `GET /sessions/:id/results` と `/logs/export.(csv|json)` を実装し、ターン番号付きのログとスコアを返す。
+  - エクスポート時に `Content-Disposition` を設定し、セッション終了後もダウンロードできるようにする。
+  - _Requirements: 4.5,5.5_
+
+- [ ] 5. SSE ブロードキャストとルールヘルプを実装する
+- [ ] 5.1 (P) SseBroadcastGateway と EventSource エンドポイントを構築する
+  - `GET /sessions/:id/stream` で接続を確立し、keep-alive コメントや Last-Event-ID 対応を実装する。
+  - `state.delta`, `state.final`, `system.error` などイベント種別ごとに JSON ペイロードを生成する。
+  - _Requirements: 5.1,5.3_
+- [ ] 5.2 (P) EventLogService と再送メカニズムを整備する
+  - 行動ログに `turn`, `actor`, `action`, `chipsDelta` を保存し、SSE から `event.log` として配信する。
+  - 再接続時は `EventLogEntry` の ID を基に差分を抽出し、抜け漏れを埋める。
+  - _Requirements: 5.2,5.5_
+- [ ] 5.3 (P) RuleHintService とルールヘルプ API を実装する
+  - 現在カード・中央チップ・プレイヤー手札を参照してテキストヒントを生成し、SSE `rule.hint` と `GET /sessions/:id/hint` で返す。
+  - 生成元の `state_version` を付与し、古いヒントが表示されないようにする。
+  - _Requirements: 5.4_
+
+- [ ] 6. エラー戦略と監視を実装する
+- [ ] 6.1 エラーレスポンスとロールバックを統一する
+  - 422/409/404/503 を返す条件を整理し、`reasonCode` とユーザー行動指示を明記する。
+  - SSE の `system.error` イベントと HTTP レスポンスから同じフォーマットで再入力手順を伝える。
+  - _Requirements: 5.3_
+- [ ] 6.2 モニタリングと診断情報を実装する
+  - `action_processing_ms`, `mutex_wait_ms`, SSE 接続数などのログを追加し、主要イベントを構造化ログで記録する。
+  - タイマー登録/解除、強制取得、エクスポート成功なども監査ログに残す。
+  - _Requirements: 2.5,5.2_
+
+- [ ] 7. テストと検証を実装する
+- [ ] 7.1 ユニットテストを整備する
+  - DeckService のカード除外、ChipLedger の残量制御、RuleHintService のヒント生成、ScoreService の連番計算を網羅するテストを作成する。
+  - エラーケース（player count、chip不足、stateVersion競合）を含め、ビジネスルール違反時の挙動を検証する。
+  - _Requirements: 1.1,1.2,2.1,2.3,3.1,3.4,4.2,5.4_
+- [ ] 7.2 統合テストと SSE フロー検証を行う
+  - 2〜4 人のフルゲームシナリオを自動化し、セットアップ→ターン→強制取得→終局→エクスポートまで検証する。
+  - SSE 接続の再接続テストや Last-Event-ID 再送を実装し、ログ欠損・エラー発生時の復旧を確認する。
+  - _Requirements: 2.5,4.5,5.1,5.2,5.3,5.5_
+- [ ]\* 7.3 負荷・パフォーマンステストをオプションで実施する
+  - 50 セッション並列処理や 500 SSE クライアントでの fan-out をシミュレートし、ボトルネックを測定する。
+  - TimerSupervisor の大量登録やエクスポート大量実行でのリソース挙動を記録して将来の横展開に備える。
+  - _Requirements: 2.5,5.1,5.2_
