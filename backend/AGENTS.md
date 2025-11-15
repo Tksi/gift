@@ -54,7 +54,6 @@ Project memory keeps persistent guidance (steering, specs notes, component docs)
 - コメントとopenapiおよびテストの説明は日本語で記載する
 - openapiのsummaryは不要
 - importは、src/をbaseUrlとする絶対パスインポートを使用する
-- Honoのドキュメントは hono-doc.md を参照する
 - クラスや interface は使わずに、関数型プログラミングスタイルで実装すること
 - テストは別フォルダに分けず、実装ファイルと同じフォルダに `*.test.ts` として配置すること
 - エンドポイントのテストのdescribeはリクエストメソッド エンドポイントパス、の形式にすること
