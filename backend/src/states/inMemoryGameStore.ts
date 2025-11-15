@@ -1,36 +1,19 @@
 import { createHash } from 'node:crypto';
+import type { z } from '@hono/zod-openapi';
+import type {
+  gamePhaseSchema,
+  snapshotSchema,
+  turnStateSchema,
+} from 'schema/game.js';
+import type { playerSummarySchema } from 'schema/players.js';
 
-export type GamePhase = 'completed' | 'running' | 'setup';
+export type GamePhase = z.infer<typeof gamePhaseSchema>;
 
-export type PlayerSummary = {
-  id: string;
-  displayName: string;
-};
+export type PlayerSummary = z.infer<typeof playerSummarySchema>;
 
-export type TurnState = {
-  turn: number;
-  currentPlayerId: string;
-  currentPlayerIndex: number;
-  cardInCenter: number | null;
-  awaitingAction: boolean;
-  deadline?: string | null;
-};
+export type TurnState = z.infer<typeof turnStateSchema>;
 
-export type GameSnapshot = {
-  sessionId: string;
-  phase: GamePhase;
-  deck: number[];
-  discardHidden: number[];
-  playerOrder: string[];
-  rngSeed: string;
-  players: PlayerSummary[];
-  chips: Record<string, number>;
-  hands: Record<string, number[]>;
-  centralPot: number;
-  turnState: TurnState;
-  createdAt: string;
-  updatedAt: string;
-};
+export type GameSnapshot = z.infer<typeof snapshotSchema>;
 
 export type EventLogEntry = {
   id: string;
