@@ -19,3 +19,23 @@ export const errorResponseSchema = z.object({
     message: z.string(),
   }),
 });
+
+const turnActionSchema = z.enum(['placeChip', 'takeCard']);
+
+export const sessionActionBodySchema = z.object({
+  command_id: z.string().min(1),
+  state_version: z.string().min(1),
+  player_id: z.string().min(1),
+  action: turnActionSchema,
+});
+
+export const sessionActionResponseSchema = sessionResponseSchema.extend({
+  turn_context: z.object({
+    turn: z.number().int().min(0),
+    current_player_id: z.string(),
+    card_in_center: z.number().int().min(0).nullable(),
+    awaiting_action: z.boolean(),
+    central_pot: z.number().int().min(0),
+    chips: z.record(z.string(), z.number().int().min(0)),
+  }),
+});
