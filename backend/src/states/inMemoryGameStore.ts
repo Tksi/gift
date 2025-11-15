@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type { z } from '@hono/zod-openapi';
 import type {
   gamePhaseSchema,
+  scoreSummarySchema,
   snapshotSchema,
   turnStateSchema,
 } from 'schema/game.js';
@@ -16,6 +17,8 @@ export type PlayerSummary = z.infer<typeof playerSummarySchema>;
 export type TurnState = z.infer<typeof turnStateSchema>;
 
 export type GameSnapshot = z.infer<typeof snapshotSchema>;
+
+export type ScoreSummary = z.infer<typeof scoreSummarySchema>;
 
 export type EventLogEntry = {
   id: string;

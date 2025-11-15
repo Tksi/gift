@@ -30,6 +30,7 @@ const createSnapshot = (
       awaitingAction: true,
       deadline: '2025-01-01T00:00:05.000Z',
     },
+    finalResults: null,
   };
 
   return {

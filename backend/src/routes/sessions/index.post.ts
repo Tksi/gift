@@ -172,6 +172,7 @@ const createInitialSnapshot = (
     },
     createdAt: timestamp,
     updatedAt: timestamp,
+    finalResults: null,
   };
 };
 

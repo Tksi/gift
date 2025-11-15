@@ -29,6 +29,57 @@ export const turnStateSchema = z.object({
   }),
 });
 
+export const scorePlacementSchema = z
+  .object({
+    rank: z.number().int().min(1).openapi({
+      description: '順位 (同点の場合は同じランク値)。',
+    }),
+    playerId: z.string().openapi({
+      description: '対象プレイヤーの ID。',
+    }),
+    score: z.number().openapi({
+      description: 'カードセットの最小値合計からチップを差し引いた最終スコア。',
+    }),
+    chipsRemaining: z.number().int().min(0).openapi({
+      description: 'スコア計算時点で残っているチップ数。',
+    }),
+    cards: z.array(z.number()).openapi({
+      description: 'プレイヤーが獲得したカード番号一覧 (昇順)。',
+    }),
+    cardSets: z.array(z.array(z.number())).openapi({
+      description: '連番ごとにグルーピングされたカードセット。',
+    }),
+  })
+  .openapi({ description: '個々のプレイヤーのスコア詳細。' });
+
+export const scoreTieBreakSchema = z
+  .object({
+    reason: z.literal('chipCount').openapi({
+      description: '今回適用されたタイブレーク理由。chipCount 固定。',
+    }),
+    tiedScore: z.number().openapi({
+      description: '同点となったスコア値。',
+    }),
+    contenders: z.array(z.string()).openapi({
+      description: '同点となったプレイヤーIDの一覧。',
+    }),
+    winner: z.string().nullable().openapi({
+      description: 'タイブレーク後の勝者ID。同点継続の場合は null。',
+    }),
+  })
+  .openapi({ description: '同点時のタイブレーク情報。' });
+
+export const scoreSummarySchema = z
+  .object({
+    placements: z.array(scorePlacementSchema).openapi({
+      description: 'スコア順に並んだプレイヤーの順位情報。',
+    }),
+    tieBreak: scoreTieBreakSchema.nullable().openapi({
+      description: '同点発生時のタイブレーク結果。なければ null。',
+    }),
+  })
+  .openapi({ description: 'ゲーム終了時の結果サマリー。' });
+
 export const snapshotSchema = z.object({
   sessionId: z.string().openapi({
     description: 'セッションを一意に識別する ID。',
@@ -69,5 +120,8 @@ export const snapshotSchema = z.object({
   }),
   updatedAt: z.string().openapi({
     description: '状態が最後に更新された日時 (ISO 8601)。',
+  }),
+  finalResults: scoreSummarySchema.nullable().openapi({
+    description: 'ゲーム終了後の最終結果。進行中は null。',
   }),
 });

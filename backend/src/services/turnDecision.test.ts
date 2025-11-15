@@ -36,6 +36,7 @@ const createSnapshot = (override: SnapshotOverride = {}): GameSnapshot => {
       cardInCenter: 12,
       awaitingAction: true,
     },
+    finalResults: null,
   };
 
   return {
@@ -192,6 +193,48 @@ describe('createTurnDecisionService の挙動', () => {
     expect(result.snapshot.turnState.awaitingAction).toBe(false);
     expect(result.snapshot.turnState.deadline).toBeNull();
     expect(clear).toHaveBeenCalledWith(envelope.snapshot.sessionId);
+  });
+
+  it('山札が尽きたらスコア計算を実施し completed フェーズへ遷移する', async () => {
+    const store = createInMemoryGameStore();
+    const snapshot = createSnapshot({
+      deck: [],
+      chips: { alice: 10, bob: 5 },
+      hands: { alice: [10], bob: [30] },
+      turnState: {
+        turn: 5,
+        currentPlayerId: 'alice',
+        currentPlayerIndex: 0,
+        cardInCenter: 15,
+        awaitingAction: true,
+      },
+    });
+    const envelope = store.saveSnapshot(snapshot);
+    const { timerSupervisor } = createTimerSupervisorStub();
+    const service = createTurnDecisionService({
+      store,
+      now: () => '2025-01-01T00:00:20.000Z',
+      timerSupervisor,
+      turnTimeoutMs: TURN_TIMEOUT_MS,
+    });
+
+    const result = await service.applyCommand({
+      sessionId: snapshot.sessionId,
+      commandId: 'cmd-final',
+      expectedVersion: envelope.version,
+      playerId: 'alice',
+      action: 'takeCard',
+    });
+
+    expect(result.snapshot.phase).toBe('completed');
+    expect(result.snapshot.finalResults).not.toBeNull();
+    expect(result.snapshot.finalResults?.placements[0]?.playerId).toBe('alice');
+
+    const logs = store.listEventLogAfter(snapshot.sessionId);
+    expect(logs.at(-1)).toMatchObject({
+      action: 'gameCompleted',
+      actor: 'system',
+    });
   });
 
   it('同じ commandId を再送すると最新状態をそのまま返す', async () => {

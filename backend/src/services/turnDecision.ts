@@ -7,6 +7,7 @@ import {
   placeChipIntoCenter,
 } from 'services/chipLedger.js';
 import { createServiceError } from 'services/errors.js';
+import { calculateScoreSummary } from 'services/scoreService.js';
 import {
   type TimerSupervisor,
   calculateTurnDeadline,
@@ -149,6 +150,11 @@ const applyTakeCard = (snapshot: GameSnapshot): void => {
   snapshot.turnState.currentPlayerIndex = findPlayerIndex(snapshot, playerId);
 };
 
+const isGameCompleted = (snapshot: GameSnapshot): boolean =>
+  snapshot.deck.length === 0 &&
+  snapshot.turnState.cardInCenter === null &&
+  snapshot.turnState.awaitingAction === false;
+
 const ensureActionAllowed = (
   snapshot: GameSnapshot,
   input: TurnCommandInput,
@@ -271,6 +277,19 @@ export const createTurnDecisionService = (
       snapshot.updatedAt = timestamp;
       updateTurnDeadline(snapshot, timestamp, dependencies.turnTimeoutMs);
 
+      let finalSummary: ReturnType<typeof calculateScoreSummary> | null = null;
+
+      if (
+        snapshot.finalResults === null &&
+        snapshot.phase !== 'completed' &&
+        isGameCompleted(snapshot)
+      ) {
+        snapshot.phase = 'completed';
+        finalSummary = calculateScoreSummary(snapshot);
+        snapshot.finalResults = finalSummary;
+        snapshot.turnState.deadline = null;
+      }
+
       const saved = dependencies.store.saveSnapshot(snapshot);
       dependencies.store.markCommandProcessed(input.sessionId, input.commandId);
 
@@ -288,6 +307,21 @@ export const createTurnDecisionService = (
         );
       } else {
         dependencies.timerSupervisor.clear(saved.snapshot.sessionId);
+      }
+
+      if (finalSummary !== null) {
+        dependencies.store.appendEventLog(saved.snapshot.sessionId, [
+          {
+            id: `game-completed-${saved.snapshot.turnState.turn}`,
+            turn: saved.snapshot.turnState.turn,
+            actor: 'system',
+            action: 'gameCompleted',
+            timestamp,
+            details: {
+              finalResults: finalSummary,
+            },
+          },
+        ]);
       }
 
       return {
