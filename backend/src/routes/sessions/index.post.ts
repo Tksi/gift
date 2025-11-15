@@ -21,7 +21,6 @@ const INITIAL_PLAYER_CHIPS = 11;
 const createSessionRoute = createRoute({
   method: 'post',
   path: '/sessions',
-  summary: 'ゲームセッションを作成する',
   description:
     '指定されたプレイヤー情報と任意のシード値を用いて Geschenkt のセットアップを実行し、初期スナップショットと状態バージョンを返します。',
   request: {
