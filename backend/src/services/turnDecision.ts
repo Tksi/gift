@@ -1,11 +1,18 @@
 /* eslint-disable no-param-reassign -- ターン処理ではクローンしたスナップショットを書き換える */
 
+import {
+  type ChipLedgerAction,
+  collectCentralPotForPlayer,
+  ensureChipActionAllowed as ensureChipLedgerActionAllowed,
+  placeChipIntoCenter,
+} from 'services/chipLedger.js';
+import { createServiceError } from 'services/errors.js';
 import type {
   GameSnapshot,
   InMemoryGameStore,
 } from 'states/inMemoryGameStore.js';
 
-export type TurnDecisionAction = 'placeChip' | 'takeCard';
+export type TurnDecisionAction = ChipLedgerAction;
 
 export type TurnCommandInput = {
   sessionId: string;
@@ -29,13 +36,7 @@ export type TurnDecisionService = {
   applyCommand: (input: TurnCommandInput) => Promise<TurnDecisionResult>;
 };
 
-type TurnDecisionError = Error & {
-  code: string;
-  status: number;
-};
-
-const createError = (code: string, status: number, message: string) =>
-  Object.assign(new Error(message), { code, status }) as TurnDecisionError;
+const createError = createServiceError;
 
 const cloneSnapshot = (snapshot: GameSnapshot): GameSnapshot =>
   structuredClone(snapshot);
@@ -107,26 +108,7 @@ const drawNextCard = (snapshot: GameSnapshot): number | undefined => {
 
 const applyPlaceChip = (snapshot: GameSnapshot): void => {
   const playerId = snapshot.turnState.currentPlayerId;
-  const chipCount = snapshot.chips[playerId];
-
-  if (chipCount === undefined) {
-    throw createError(
-      'PLAYER_NOT_FOUND',
-      404,
-      `Player ${playerId} is not registered.`,
-    );
-  }
-
-  if (chipCount <= 0) {
-    throw createError(
-      'CHIP_INSUFFICIENT',
-      422,
-      'Player does not have enough chips.',
-    );
-  }
-
-  snapshot.chips[playerId] = chipCount - 1;
-  snapshot.centralPot += 1;
+  placeChipIntoCenter(snapshot, playerId);
   rotateToNextPlayer(snapshot);
 };
 
@@ -145,12 +127,7 @@ const applyTakeCard = (snapshot: GameSnapshot): void => {
   const hand = snapshot.hands[playerId] ?? [];
   snapshot.hands[playerId] = sortHand([...hand, card]);
 
-  if (snapshot.centralPot > 0) {
-    const chips = snapshot.chips[playerId] ?? 0;
-    snapshot.chips[playerId] = chips + snapshot.centralPot;
-  }
-
-  snapshot.centralPot = 0;
+  collectCentralPotForPlayer(snapshot, playerId);
   snapshot.turnState.cardInCenter = null;
   snapshot.turnState.awaitingAction = false;
 
@@ -199,6 +176,8 @@ const ensureActionAllowed = (
       'Action is only allowed for the current player.',
     );
   }
+
+  ensureChipLedgerActionAllowed(snapshot, input.playerId, input.action);
 };
 
 const applyAction = (snapshot: GameSnapshot, input: TurnCommandInput) => {
