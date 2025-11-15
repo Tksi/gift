@@ -1,11 +1,21 @@
 import { serve } from '@hono/node-server';
-import { Hono } from 'hono';
+import { OpenAPIHono } from '@hono/zod-openapi';
+import { Scalar } from '@scalar/hono-api-reference';
+import { roomsIndexGet } from 'routes/rooms/index.get.js';
 
-const app = new Hono();
+const app = new OpenAPIHono();
 
-app.get('/', (c) => {
-  return c.text('Hello Hono!');
-});
+app.route('/', roomsIndexGet);
+
+app
+  .doc('/doc', {
+    openapi: '3.0.0',
+    info: {
+      version: '1.0.0',
+      title: 'My API',
+    },
+  })
+  .get('/scalar', Scalar({ url: '/doc' }));
 
 serve(
   {
