@@ -30,7 +30,7 @@ type ErrorResponse = {
   };
 };
 
-describe('sessions state GET ルート', () => {
+describe('GET /sessions/{sessionId}/state', () => {
   it('最新スナップショットを返し ETag をヘッダーへ付与する', async () => {
     const { app } = createTestApp();
 

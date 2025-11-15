@@ -30,7 +30,7 @@ type ErrorResponse = {
   };
 };
 
-describe('sessions POST ルート', () => {
+describe('POST /sessions', () => {
   it('公平なセットアップで新規セッションを作成しスナップショットとバージョン情報を返す', async () => {
     const { app, store } = createTestApp();
 

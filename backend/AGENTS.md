@@ -57,6 +57,7 @@ Project memory keeps persistent guidance (steering, specs notes, component docs)
 - Honoのドキュメントは hono-doc.md を参照する
 - クラスや interface は使わずに、関数型プログラミングスタイルで実装すること
 - テストは別フォルダに分けず、実装ファイルと同じフォルダに `*.test.ts` として配置すること
+- エンドポイントのテストのdescribeはリクエストメソッド エンドポイントパス、の形式にすること
 
 ## Steering Configuration
 

@@ -30,7 +30,7 @@ type ErrorResponse = {
   };
 };
 
-describe('sessions GET ルート', () => {
+describe('GET /sessions/{sessionId}', () => {
   it('ID で取得すると保存済みセッションを返す', async () => {
     const { app } = createTestApp();
 
