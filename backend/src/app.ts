@@ -5,6 +5,7 @@ import { registerSessionPostRoute } from 'routes/sessions/index.post.js';
 import { registerSessionActionsPostRoute } from 'routes/sessions/{sessionId}/actions.post.js';
 import { registerSessionGetRoute } from 'routes/sessions/{sessionId}/index.get.js';
 import { registerSessionStateGetRoute } from 'routes/sessions/{sessionId}/state.get.js';
+import { createTimeoutCommandHandler } from 'services/systemTimeoutHandler.js';
 import {
   type TimerSupervisor,
   createTimerSupervisor,
@@ -22,9 +23,7 @@ export type CreateAppOptions = {
   turnTimeoutMs?: number;
 };
 
-const noopTimeoutHandler = (): void => {
-  // 強制取得フローは Task 3.2 で実装予定のため、現時点では no-op。
-};
+const noopTimeoutHandler = (): void => undefined;
 
 /**
  * 共通ミドルウェアやドキュメント、ルートをまとめた API アプリケーションを構築する。
@@ -37,6 +36,8 @@ export const createApp = (options: CreateAppOptions = {}) => {
   const now = options.now ?? (() => new Date().toISOString());
   const generateSessionId = options.generateSessionId ?? (() => randomUUID());
   const turnTimeoutMs = options.turnTimeoutMs ?? 45_000;
+  let timeoutHandler: (sessionId: string) => Promise<void> | void =
+    noopTimeoutHandler;
   const timerSupervisor =
     options.timerSupervisor ??
     createTimerSupervisor({
@@ -44,7 +45,7 @@ export const createApp = (options: CreateAppOptions = {}) => {
       now: () => Date.now(),
       schedule: (handler, delay) => setTimeout(handler, delay),
       cancel: (handle) => clearTimeout(handle),
-      onTimeout: noopTimeoutHandler,
+      onTimeout: (sessionId) => timeoutHandler(sessionId),
     });
 
   const sessionsApp = new OpenAPIHono();
@@ -54,6 +55,14 @@ export const createApp = (options: CreateAppOptions = {}) => {
     timerSupervisor,
     turnTimeoutMs,
   });
+
+  if (options.timerSupervisor === undefined) {
+    timeoutHandler = createTimeoutCommandHandler({
+      store,
+      turnService,
+    });
+  }
+
   const sessionDependencies: SessionRouteDependencies = {
     store,
     now,
