@@ -7,6 +7,15 @@ export type PlayerSummary = {
   displayName: string;
 };
 
+export type TurnState = {
+  turn: number;
+  currentPlayerId: string;
+  currentPlayerIndex: number;
+  cardInCenter: number | null;
+  awaitingAction: boolean;
+  deadline?: string | null;
+};
+
 export type GameSnapshot = {
   sessionId: string;
   phase: GamePhase;
@@ -18,6 +27,7 @@ export type GameSnapshot = {
   chips: Record<string, number>;
   hands: Record<string, number[]>;
   centralPot: number;
+  turnState: TurnState;
   createdAt: string;
   updatedAt: string;
 };

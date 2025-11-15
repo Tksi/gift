@@ -27,6 +27,13 @@ const makeSnapshot = ({
   chips: { alice: 11, bob: 11 },
   hands: { alice: [], bob: [] },
   centralPot: 0,
+  turnState: {
+    turn: 1,
+    currentPlayerId: 'alice',
+    currentPlayerIndex: 0,
+    cardInCenter: 10,
+    awaitingAction: true,
+  },
   createdAt: '2025-01-01T00:00:00.000Z',
   updatedAt,
 });

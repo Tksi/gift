@@ -17,7 +17,7 @@
   - _Requirements: 1.4,5.1,5.3_
 
 - [ ] 2. ターン進行とチップ管理のサービス群を実装する
-- [ ] 2.1 TurnDecisionService で行動適用と冪等性を実現する
+- [x] 2.1 TurnDecisionService で行動適用と冪等性を実現する
   - `commandId` と `stateVersion` を検証し、競合時は 409 を返して最新状態取得を促す。
   - カード公開→アクション選択→ターン移動の一連フローを snapshot へ適用し、エラー時は直前の状態へロールバックする。
   - _Requirements: 2.1,2.2,2.3,5.3_

@@ -66,6 +66,12 @@ describe('POST /sessions', () => {
       centralPot: 0,
     });
 
+    expect(snapshot.turnState.turn).toBe(1);
+    expect(typeof snapshot.turnState.currentPlayerId).toBe('string');
+    expect(snapshot.turnState.currentPlayerIndex).toBe(0);
+    expect(snapshot.turnState.awaitingAction).toBe(true);
+    expect(typeof snapshot.turnState.cardInCenter).toBe('number');
+
     expect(snapshot.players).toEqual([
       { id: 'alice', displayName: 'Alice' },
       { id: 'bob', displayName: 'Bob' },
@@ -78,9 +84,14 @@ describe('POST /sessions', () => {
     const deck = snapshot.deck;
     const discardHidden = snapshot.discardHidden;
 
-    expect(deck).toHaveLength(24);
+    expect(deck).toHaveLength(23);
+    expect(deck).not.toContain(snapshot.turnState.cardInCenter);
     expect(discardHidden).toHaveLength(9);
-    const combined = [...deck, ...discardHidden].toSorted((a, b) => a - b);
+    const combinedSource =
+      snapshot.turnState.cardInCenter === null
+        ? [...deck, ...discardHidden]
+        : [snapshot.turnState.cardInCenter, ...deck, ...discardHidden];
+    const combined = combinedSource.toSorted((a, b) => a - b);
     expect(combined[0]).toBe(3);
     expect(combined.at(-1)).toBe(35);
     expect(new Set(combined).size).toBe(33);

@@ -145,10 +145,16 @@ const createInitialSnapshot = (
     hands[player.id] = [];
   }
 
+  const [activeCard, ...remainingDeck] = setup.deck;
+  const firstPlayerIndex = 0;
+  const firstPlayerId =
+    setup.playerOrder[firstPlayerIndex] ?? players[0]?.id ?? '';
+  const awaitingAction = activeCard !== undefined;
+
   return {
     sessionId,
     phase: 'setup',
-    deck: setup.deck,
+    deck: remainingDeck,
     discardHidden: setup.discardHidden,
     playerOrder: setup.playerOrder,
     rngSeed: setup.rngSeed,
@@ -156,6 +162,13 @@ const createInitialSnapshot = (
     chips,
     hands,
     centralPot: 0,
+    turnState: {
+      turn: awaitingAction ? 1 : 0,
+      currentPlayerId: firstPlayerId,
+      currentPlayerIndex: firstPlayerIndex,
+      cardInCenter: activeCard ?? null,
+      awaitingAction,
+    },
     createdAt: timestamp,
     updatedAt: timestamp,
   };

@@ -3,6 +3,15 @@ import { playerSummarySchema } from './players.js';
 
 export const gamePhaseSchema = z.enum(['setup', 'running', 'completed']);
 
+export const turnStateSchema = z.object({
+  turn: z.number().int().min(0),
+  currentPlayerId: z.string(),
+  currentPlayerIndex: z.number().int().min(0),
+  cardInCenter: z.number().nullable(),
+  awaitingAction: z.boolean(),
+  deadline: z.string().nullable().optional(),
+});
+
 export const snapshotSchema = z.object({
   sessionId: z.string(),
   phase: gamePhaseSchema,
@@ -14,6 +23,7 @@ export const snapshotSchema = z.object({
   chips: z.record(z.string(), z.number()),
   hands: z.record(z.string(), z.array(z.number())),
   centralPot: z.number(),
+  turnState: turnStateSchema,
   createdAt: z.string(),
   updatedAt: z.string(),
 });
