@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { Scalar } from '@scalar/hono-api-reference';
 import { registerSessionGetRoute } from 'routes/sessions/[sessionId]/index.get.js';
+import { registerSessionStateGetRoute } from 'routes/sessions/[sessionId]/state.get.js';
 import { registerSessionPostRoute } from 'routes/sessions/index.post.js';
 import { createInMemoryGameStore } from 'states/inMemoryGameStore.js';
 import type { SessionRouteDependencies } from 'routes/sessions/types.js';
@@ -33,6 +34,7 @@ export const createApp = (options: CreateAppOptions = {}) => {
 
   registerSessionPostRoute(sessionsApp, sessionDependencies);
   registerSessionGetRoute(sessionsApp, sessionDependencies);
+  registerSessionStateGetRoute(sessionsApp, sessionDependencies);
 
   app.route('/', sessionsApp);
 
