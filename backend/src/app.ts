@@ -51,7 +51,7 @@ export const createApp = (options: CreateAppOptions = {}) => {
       openapi: '3.0.0',
       info: {
         version: '1.0.0',
-        title: 'Geschenkt API ドキュメント',
+        title: 'API ドキュメント',
       },
     })
     .get('/scalar', Scalar({ url: '/doc' }));

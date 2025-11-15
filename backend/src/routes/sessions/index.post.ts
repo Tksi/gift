@@ -22,7 +22,7 @@ const createSessionRoute = createRoute({
   method: 'post',
   path: '/sessions',
   description:
-    '指定されたプレイヤー情報と任意のシード値を用いて Geschenkt のセットアップを実行し、初期スナップショットと状態バージョンを返します。',
+    '指定されたプレイヤー情報と任意のシード値を用いてゲームのセットアップを実行し、初期スナップショットと状態バージョンを返します。',
   request: {
     body: {
       required: true,
