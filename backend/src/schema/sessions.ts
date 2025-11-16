@@ -32,6 +32,13 @@ export const errorResponseSchema = z.object({
       message: z.string().openapi({
         description: 'エラーの詳細メッセージ。',
       }),
+      reason_code: z.string().openapi({
+        description:
+          'ユーザーが次に取るべき対処を示す理由コード。例: REQUEST_INVALID。',
+      }),
+      instruction: z.string().openapi({
+        description: 'ユーザー向けの具体的な再入力・再試行手順。',
+      }),
     })
     .openapi({
       description: 'エラー情報オブジェクト。',

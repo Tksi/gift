@@ -4,6 +4,7 @@ import {
   errorResponseSchema,
   sessionResultsResponseSchema,
 } from 'schema/sessions.js';
+import { createErrorResponseBody } from 'services/errors.js';
 import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { SessionRouteDependencies } from 'routes/sessions/types.js';
 
@@ -69,12 +70,11 @@ export const registerSessionResultsGetRoute = (
 
     if (finalResults === null) {
       return c.json(
-        {
-          error: {
-            code: 'RESULT_NOT_READY',
-            message: 'Session has not completed yet.',
-          },
-        },
+        createErrorResponseBody({
+          code: 'RESULT_NOT_READY',
+          message: 'Session has not completed yet.',
+          status: 409,
+        }),
         409,
       );
     }

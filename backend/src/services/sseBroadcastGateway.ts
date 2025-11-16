@@ -1,3 +1,4 @@
+import type { ErrorDetail } from 'services/errors.js';
 import type { RuleHint } from 'services/ruleHintService.js';
 import type { EventLogEntry, GameSnapshot } from 'states/inMemoryGameStore.js';
 
@@ -30,10 +31,7 @@ export type SseBroadcastGateway = {
     snapshot: GameSnapshot,
     version: string,
   ) => void;
-  publishSystemError: (
-    sessionId: string,
-    payload: { code: string; message: string },
-  ) => void;
+  publishSystemError: (sessionId: string, payload: ErrorDetail) => void;
   publishEventLog: (sessionId: string, entry: EventLogEntry) => void;
   publishRuleHint: (
     sessionId: string,
@@ -81,7 +79,7 @@ const createStateFinalEvent = (
 
 const createSystemErrorEvent = (
   sessionId: string,
-  payload: { code: string; message: string },
+  payload: ErrorDetail,
 ): SseEventPayload => ({
   id: `system-error:${Date.now().toString(16)}`,
   event: 'system.error',
@@ -240,10 +238,7 @@ export const createSseBroadcastGateway = (): SseBroadcastGateway => {
     broadcast(sessionId, event);
   };
 
-  const publishSystemError = (
-    sessionId: string,
-    payload: { code: string; message: string },
-  ) => {
+  const publishSystemError = (sessionId: string, payload: ErrorDetail) => {
     broadcast(sessionId, createSystemErrorEvent(sessionId, payload));
   };
 

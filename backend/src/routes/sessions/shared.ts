@@ -1,3 +1,4 @@
+import { createErrorResponseBody } from 'services/errors.js';
 import type { Context } from 'hono';
 import type { SessionEnvelope } from 'states/inMemoryGameStore.js';
 
@@ -23,9 +24,11 @@ export const respondValidationError = (
   message: string,
 ) =>
   c.json(
-    {
-      error: { code, message },
-    },
+    createErrorResponseBody({
+      code,
+      message,
+      status: 422,
+    }),
     422,
   );
 
@@ -37,8 +40,10 @@ export const respondValidationError = (
  */
 export const respondNotFound = (c: Context, code: string, message: string) =>
   c.json(
-    {
-      error: { code, message },
-    },
+    createErrorResponseBody({
+      code,
+      message,
+      status: 404,
+    }),
     404,
   );

@@ -27,6 +27,8 @@ type SessionResponse = {
 type ErrorResponse = {
   error: {
     code: string;
+    reason_code: string;
+    instruction: string;
   };
 };
 
@@ -101,5 +103,9 @@ describe('GET /sessions/{sessionId}/state', () => {
 
     const payload = (await response.json()) as ErrorResponse;
     expect(payload.error.code).toBe('SESSION_NOT_FOUND');
+    expect(payload.error.reason_code).toBe('RESOURCE_NOT_FOUND');
+    expect(payload.error.instruction).toBe(
+      'Verify the identifier or create a new session.',
+    );
   });
 });

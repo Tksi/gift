@@ -35,6 +35,8 @@ type SessionResponse = {
 type ErrorResponse = {
   error: {
     code: string;
+    reason_code: string;
+    instruction: string;
   };
 };
 
@@ -134,5 +136,9 @@ describe('POST /sessions', () => {
     expect(response.status).toBe(422);
     const payload = (await response.json()) as ErrorResponse;
     expect(payload.error.code).toBe('PLAYER_COUNT_INVALID');
+    expect(payload.error.reason_code).toBe('REQUEST_INVALID');
+    expect(payload.error.instruction).toBe(
+      'Review the request payload and try again.',
+    );
   });
 });

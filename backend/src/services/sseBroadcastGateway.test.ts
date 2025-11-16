@@ -1,5 +1,6 @@
 import { createSseBroadcastGateway } from 'services/sseBroadcastGateway.js';
 import { describe, expect, it, vi } from 'vitest';
+import type { SseEventPayload } from 'services/sseBroadcastGateway.js';
 import type { GameSnapshot } from 'states/inMemoryGameStore.js';
 
 const createSnapshot = (override: Partial<GameSnapshot> = {}): GameSnapshot => {
@@ -45,7 +46,7 @@ const createSnapshot = (override: Partial<GameSnapshot> = {}): GameSnapshot => {
 describe('createSseBroadcastGateway', () => {
   it('state.delta の publish を接続中クライアントへブロードキャストする', () => {
     const gateway = createSseBroadcastGateway();
-    const send = vi.fn();
+    const send = vi.fn<(event: SseEventPayload) => void>();
 
     const connection = gateway.connect({
       sessionId: 'session-1',
@@ -72,7 +73,7 @@ describe('createSseBroadcastGateway', () => {
     gateway.publishStateDelta(snapshot.sessionId, snapshot, 'version-1');
     gateway.publishStateDelta(snapshot.sessionId, snapshot, 'version-2');
 
-    const send = vi.fn();
+    const send = vi.fn<(event: SseEventPayload) => void>();
 
     const connection = gateway.connect({
       sessionId: snapshot.sessionId,
@@ -92,7 +93,7 @@ describe('createSseBroadcastGateway', () => {
 
   it('publishEventLog は event.log を接続中クライアントへ送信する', () => {
     const gateway = createSseBroadcastGateway();
-    const send = vi.fn();
+    const send = vi.fn<(event: SseEventPayload) => void>();
 
     const connection = gateway.connect({
       sessionId: 'session-1',
@@ -119,7 +120,7 @@ describe('createSseBroadcastGateway', () => {
 
   it('publishRuleHint は rule.hint イベントを送信する', () => {
     const gateway = createSseBroadcastGateway();
-    const send = vi.fn();
+    const send = vi.fn<(event: SseEventPayload) => void>();
 
     const connection = gateway.connect({
       sessionId: 'session-2',
@@ -141,6 +142,51 @@ describe('createSseBroadcastGateway', () => {
         event: 'rule.hint',
         id: 'rule-hint:version-3',
       }),
+    );
+
+    connection.disconnect();
+  });
+
+  it('publishSystemError は reason_code と instruction を含む system.error を配信する', () => {
+    const gateway = createSseBroadcastGateway();
+    const send = vi.fn<(event: SseEventPayload) => void>();
+
+    const connection = gateway.connect({
+      sessionId: 'session-error',
+      send,
+    });
+
+    gateway.publishSystemError('session-error', {
+      code: 'STATE_VERSION_MISMATCH',
+      message: 'State mismatch.',
+      reason_code: 'STATE_CONFLICT',
+      instruction: 'Fetch the latest state and resend the command.',
+    });
+
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'system.error',
+      }),
+    );
+
+    const firstCall = send.mock.calls[0];
+
+    if (!firstCall) {
+      throw new Error('system.error event was not emitted');
+    }
+
+    const [event] = firstCall;
+
+    const payload = JSON.parse(event.data) as {
+      error: {
+        reason_code: string;
+        instruction: string;
+      };
+    };
+
+    expect(payload.error.reason_code).toBe('STATE_CONFLICT');
+    expect(payload.error.instruction).toBe(
+      'Fetch the latest state and resend the command.',
     );
 
     connection.disconnect();

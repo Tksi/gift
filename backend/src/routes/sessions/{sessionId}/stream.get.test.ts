@@ -8,6 +8,14 @@ type SessionResponse = {
   state: GameSnapshot;
 };
 
+type ErrorResponse = {
+  error: {
+    code: string;
+    reason_code: string;
+    instruction: string;
+  };
+};
+
 const createSseEventReader = (body: ReadableStream<Uint8Array>) => {
   const reader = body.getReader();
   const decoder = new TextDecoder();
@@ -269,6 +277,12 @@ describe('GET /sessions/{sessionId}/stream', () => {
     const app = createApp();
     const response = await app.request('/sessions/missing/stream');
     expect(response.status).toBe(404);
+    const payload = (await response.json()) as ErrorResponse;
+    expect(payload.error.code).toBe('SESSION_NOT_FOUND');
+    expect(payload.error.reason_code).toBe('RESOURCE_NOT_FOUND');
+    expect(payload.error.instruction).toBe(
+      'Verify the identifier or create a new session.',
+    );
   });
 
   it('Last-Event-ID がイベントログの場合はその ID 以降を再送する', async () => {

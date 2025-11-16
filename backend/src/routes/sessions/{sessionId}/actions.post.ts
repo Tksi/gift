@@ -4,10 +4,10 @@ import {
   sessionActionBodySchema,
   sessionActionResponseSchema,
 } from 'schema/sessions.js';
+import { type ServiceError, createErrorResponseBody } from 'services/errors.js';
 import { publishStateEvents } from 'services/ssePublisher.js';
 import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { SessionRouteDependencies } from 'routes/sessions/types.js';
-import type { ServiceError } from 'services/errors.js';
 import type { GameSnapshot } from 'states/inMemoryGameStore.js';
 
 const postSessionActionRoute = createRoute({
@@ -133,16 +133,16 @@ export const registerSessionActionsPostRoute = (
       return c.json(toActionResponse(result.snapshot, result.version), 200);
     } catch (err) {
       if (isServiceError(err)) {
-        if (err.status === 404 || err.status === 409 || err.status === 422) {
-          return c.json(
-            {
-              error: {
-                code: err.code,
-                message: err.message,
-              },
-            },
-            err.status,
-          );
+        if ([404, 409, 422].includes(err.status)) {
+          const status = err.status as 404 | 409 | 422;
+          const body = createErrorResponseBody({
+            code: err.code,
+            message: err.message,
+            status,
+          });
+          dependencies.sseGateway.publishSystemError(sessionId, body.error);
+
+          return c.json(body, status);
         }
 
         throw err;
