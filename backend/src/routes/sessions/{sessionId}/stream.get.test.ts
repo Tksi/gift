@@ -172,29 +172,53 @@ describe('GET /sessions/{sessionId}/stream', () => {
     const reader = createSseEventReader(body);
     await readNextDataEvent(reader);
 
-    await app.request(`/sessions/${session.session_id}/actions`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
+    const actorId = session.state.turnState.currentPlayerId;
+
+    const actionResponse = await app.request(
+      `/sessions/${session.session_id}/actions`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          command_id: 'cmd-1',
+          state_version: session.state_version,
+          player_id: actorId,
+          action: 'placeChip',
+        }),
       },
-      body: JSON.stringify({
-        command_id: 'cmd-1',
-        state_version: session.state_version,
-        player_id: session.state.players[0]?.id ?? 'alice',
-        action: 'placeChip',
-      }),
-    });
+    );
 
-    const event = await readNextDataEvent(reader);
+    expect(actionResponse.status).toBe(200);
 
-    expect(event).not.toBeNull();
+    const logEvent = await readNextDataEvent(reader);
 
-    if (!event) {
+    expect(logEvent).not.toBeNull();
+
+    if (!logEvent) {
       return;
     }
 
-    expect(event.event).toBe('state.delta');
-    const data = JSON.parse(event.data) as SessionResponse;
+    expect(logEvent.event).toBe('event.log');
+    const logData = JSON.parse(logEvent.data) as {
+      id: string;
+      actor: string;
+      action: string;
+    };
+    expect(logData.actor).toBe(actorId);
+    expect(logData.action).toBe('placeChip');
+
+    const stateEvent = await readNextDataEvent(reader);
+
+    expect(stateEvent).not.toBeNull();
+
+    if (!stateEvent) {
+      return;
+    }
+
+    expect(stateEvent.event).toBe('state.delta');
+    const data = JSON.parse(stateEvent.data) as SessionResponse;
     expect(data.state_version).not.toBe(session.state_version);
     await reader.cancel();
   });
@@ -203,5 +227,90 @@ describe('GET /sessions/{sessionId}/stream', () => {
     const app = createApp();
     const response = await app.request('/sessions/missing/stream');
     expect(response.status).toBe(404);
+  });
+
+  it('Last-Event-ID がイベントログの場合はその ID 以降を再送する', async () => {
+    const { app, session } = await createSession();
+
+    const firstPlayerId = session.state.turnState.currentPlayerId;
+
+    const firstActionResponse = await app.request(
+      `/sessions/${session.session_id}/actions`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          command_id: 'cmd-1',
+          state_version: session.state_version,
+          player_id: firstPlayerId,
+          action: 'placeChip',
+        }),
+      },
+    );
+
+    expect(firstActionResponse.status).toBe(200);
+
+    const firstActionPayload =
+      (await firstActionResponse.json()) as SessionResponse;
+
+    const secondPlayerId =
+      firstActionPayload.state.turnState.currentPlayerId ??
+      session.state.players.find((player) => player.id !== firstPlayerId)?.id ??
+      firstPlayerId;
+
+    const secondActionResponse = await app.request(
+      `/sessions/${session.session_id}/actions`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          command_id: 'cmd-2',
+          state_version: firstActionPayload.state_version,
+          player_id: secondPlayerId,
+          action: 'placeChip',
+        }),
+      },
+    );
+
+    expect(secondActionResponse.status).toBe(200);
+
+    const firstResponse = await app.request(
+      `/sessions/${session.session_id}/stream`,
+    );
+    const initialReader = createSseEventReader(firstResponse.body!);
+    await readNextDataEvent(initialReader);
+    const firstLog = await readNextDataEvent(initialReader);
+    await initialReader.cancel();
+
+    if (!firstLog) {
+      throw new Error('expected log event');
+    }
+
+    const reconnectResponse = await app.request(
+      `/sessions/${session.session_id}/stream`,
+      {
+        headers: {
+          'last-event-id': firstLog.id,
+        },
+      },
+    );
+
+    const reader = createSseEventReader(reconnectResponse.body!);
+    await readNextDataEvent(reader);
+    const replayedLog = await readNextDataEvent(reader);
+
+    expect(replayedLog).not.toBeNull();
+
+    if (!replayedLog) {
+      return;
+    }
+
+    expect(replayedLog.id).not.toBe(firstLog.id);
+    expect(replayedLog.event).toBe('event.log');
+    await reader.cancel();
   });
 });

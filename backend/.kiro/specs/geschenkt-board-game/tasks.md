@@ -56,7 +56,7 @@
   - `GET /sessions/:id/stream` で接続を確立し、keep-alive コメントや Last-Event-ID 対応を実装する。
   - `state.delta`, `state.final`, `system.error` などイベント種別ごとに JSON ペイロードを生成する。
   - _Requirements: 5.1,5.3_
-- [ ] 5.2 (P) EventLogService と再送メカニズムを整備する
+- [x] 5.2 (P) EventLogService と再送メカニズムを整備する
   - 行動ログに `turn`, `actor`, `action`, `chipsDelta` を保存し、SSE から `event.log` として配信する。
   - 再接続時は `EventLogEntry` の ID を基に差分を抽出し、抜け漏れを埋める。
   - _Requirements: 5.2,5.5_

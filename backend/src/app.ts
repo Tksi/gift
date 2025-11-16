@@ -10,6 +10,10 @@ import { registerSessionResultsGetRoute } from 'routes/sessions/{sessionId}/resu
 import { registerSessionStateGetRoute } from 'routes/sessions/{sessionId}/state.get.js';
 import { registerSessionStreamGetRoute } from 'routes/sessions/{sessionId}/stream.get.js';
 import {
+  type EventLogService,
+  createEventLogService,
+} from 'services/eventLogService.js';
+import {
   type SseBroadcastGateway,
   createSseBroadcastGateway,
 } from 'services/sseBroadcastGateway.js';
@@ -30,6 +34,7 @@ export type CreateAppOptions = {
   timerSupervisor?: TimerSupervisor;
   turnTimeoutMs?: number;
   sseGateway?: SseBroadcastGateway;
+  eventLogService?: EventLogService;
 };
 
 const noopTimeoutHandler = (): void => undefined;
@@ -46,6 +51,12 @@ export const createApp = (options: CreateAppOptions = {}) => {
   const generateSessionId = options.generateSessionId ?? (() => randomUUID());
   const turnTimeoutMs = options.turnTimeoutMs ?? 45_000;
   const sseGateway = options.sseGateway ?? createSseBroadcastGateway();
+  const eventLogService =
+    options.eventLogService ??
+    createEventLogService({
+      store,
+      sseGateway,
+    });
   let timeoutHandler: (sessionId: string) => Promise<void> | void =
     noopTimeoutHandler;
   const timerSupervisor =
@@ -64,6 +75,7 @@ export const createApp = (options: CreateAppOptions = {}) => {
     now,
     timerSupervisor,
     turnTimeoutMs,
+    eventLogs: eventLogService,
   });
 
   if (options.timerSupervisor === undefined) {
@@ -82,6 +94,7 @@ export const createApp = (options: CreateAppOptions = {}) => {
     timerSupervisor,
     turnTimeoutMs,
     sseGateway,
+    eventLogService,
   };
 
   timerSupervisor.restore();

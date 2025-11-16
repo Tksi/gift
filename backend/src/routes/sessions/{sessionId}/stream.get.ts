@@ -63,6 +63,11 @@ export const registerSessionStreamGetRoute = (
     }
 
     const lastEventIdHeader = c.req.header('last-event-id');
+    const logReplayAfterId = dependencies.eventLogService.isEventLogId(
+      lastEventIdHeader ?? null,
+    )
+      ? (lastEventIdHeader ?? undefined)
+      : undefined;
     let connection: { disconnect: () => void } | null = null;
     let keepAliveHandle: ReturnType<typeof setInterval> | null = null;
 
@@ -105,6 +110,23 @@ export const registerSessionStreamGetRoute = (
           void stream.write(': keep-alive\n\n');
         }, KEEP_ALIVE_INTERVAL_MS);
 
+        const replayInput: Parameters<
+          typeof dependencies.eventLogService.replayEntries
+        >[0] = {
+          sessionId,
+          send: (entry) =>
+            stream.writeSSE({
+              id: entry.id,
+              event: 'event.log',
+              data: JSON.stringify(entry),
+            }),
+        };
+
+        if (logReplayAfterId !== undefined) {
+          replayInput.lastEventId = logReplayAfterId;
+        }
+
+        await dependencies.eventLogService.replayEntries(replayInput);
         await new Promise<void>((resolve) => {
           stream.onAbort(() => {
             cleanup();
@@ -112,9 +134,10 @@ export const registerSessionStreamGetRoute = (
           });
         });
       },
-      async (err) => {
+      async (err, stream) => {
         cleanup();
         console.error(err);
+        await stream.write(': error\n\n');
       },
     );
   });

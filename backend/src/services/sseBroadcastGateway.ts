@@ -1,4 +1,4 @@
-import type { GameSnapshot } from 'states/inMemoryGameStore.js';
+import type { EventLogEntry, GameSnapshot } from 'states/inMemoryGameStore.js';
 
 export type SseEventPayload = {
   id: string;
@@ -33,6 +33,7 @@ export type SseBroadcastGateway = {
     sessionId: string,
     payload: { code: string; message: string },
   ) => void;
+  publishEventLog: (sessionId: string, entry: EventLogEntry) => void;
 };
 
 const MAX_EVENT_HISTORY = 100;
@@ -103,8 +104,17 @@ export const createSseBroadcastGateway = (): SseBroadcastGateway => {
     history.set(sessionId, events);
   };
 
-  const broadcast = (sessionId: string, event: SseEventPayload) => {
-    appendHistory(sessionId, event);
+  const broadcast = (
+    sessionId: string,
+    event: SseEventPayload,
+    options: { remember?: boolean } = {},
+  ) => {
+    const shouldRemember = options.remember ?? true;
+
+    if (shouldRemember) {
+      appendHistory(sessionId, event);
+    }
+
     const listeners = connections.get(sessionId);
 
     if (!listeners) {
@@ -214,10 +224,21 @@ export const createSseBroadcastGateway = (): SseBroadcastGateway => {
     broadcast(sessionId, createSystemErrorEvent(sessionId, payload));
   };
 
+  const publishEventLog = (sessionId: string, entry: EventLogEntry) => {
+    const event: SseEventPayload = {
+      id: entry.id,
+      event: 'event.log',
+      data: JSON.stringify(entry),
+    };
+
+    broadcast(sessionId, event, { remember: false });
+  };
+
   return {
     connect,
     publishStateDelta,
     publishStateFinal,
     publishSystemError,
+    publishEventLog,
   };
 };

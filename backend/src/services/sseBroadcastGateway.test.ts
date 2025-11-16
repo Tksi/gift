@@ -89,4 +89,31 @@ describe('createSseBroadcastGateway', () => {
 
     connection.disconnect();
   });
+
+  it('publishEventLog は event.log を接続中クライアントへ送信する', () => {
+    const gateway = createSseBroadcastGateway();
+    const send = vi.fn();
+
+    const connection = gateway.connect({
+      sessionId: 'session-1',
+      send,
+    });
+
+    gateway.publishEventLog('session-1', {
+      id: 'turn-1-log-1',
+      turn: 1,
+      actor: 'p1',
+      action: 'placeChip',
+      timestamp: '2025-01-01T00:00:00.000Z',
+    });
+
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'event.log',
+        id: 'turn-1-log-1',
+      }),
+    );
+
+    connection.disconnect();
+  });
 });
