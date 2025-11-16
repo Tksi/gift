@@ -4,6 +4,9 @@ import { Scalar } from '@scalar/hono-api-reference';
 import { registerSessionPostRoute } from 'routes/sessions/index.post.js';
 import { registerSessionActionsPostRoute } from 'routes/sessions/{sessionId}/actions.post.js';
 import { registerSessionGetRoute } from 'routes/sessions/{sessionId}/index.get.js';
+import { registerLogsExportCsvRoute } from 'routes/sessions/{sessionId}/logs/export.csv.get.js';
+import { registerLogsExportJsonRoute } from 'routes/sessions/{sessionId}/logs/export.json.get.js';
+import { registerSessionResultsGetRoute } from 'routes/sessions/{sessionId}/results.get.js';
 import { registerSessionStateGetRoute } from 'routes/sessions/{sessionId}/state.get.js';
 import { createTimeoutCommandHandler } from 'services/systemTimeoutHandler.js';
 import {
@@ -78,6 +81,9 @@ export const createApp = (options: CreateAppOptions = {}) => {
   registerSessionGetRoute(sessionsApp, sessionDependencies);
   registerSessionStateGetRoute(sessionsApp, sessionDependencies);
   registerSessionActionsPostRoute(sessionsApp, sessionDependencies);
+  registerSessionResultsGetRoute(sessionsApp, sessionDependencies);
+  registerLogsExportCsvRoute(sessionsApp, sessionDependencies);
+  registerLogsExportJsonRoute(sessionsApp, sessionDependencies);
 
   app.route('/', sessionsApp);
 

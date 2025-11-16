@@ -46,7 +46,7 @@
   - 連番グループ化と最小値スコア算出ロジックを実装し、同点時のチップ差し引きで順位を決める。
   - 最終結果を snapshot とログへ記録し、`state.final` SSE イベントを生成する。
   - _Requirements: 4.1,4.2,4.3,4.4_
-- [ ] 4.2 ResultExportService と履歴 API を実装する
+- [x] 4.2 ResultExportService と履歴 API を実装する
   - `GET /sessions/:id/results` と `/logs/export.(csv|json)` を実装し、ターン番号付きのログとスコアを返す。
   - エクスポート時に `Content-Disposition` を設定し、セッション終了後もダウンロードできるようにする。
   - _Requirements: 4.5,5.5_
