@@ -52,7 +52,7 @@
   - _Requirements: 4.5,5.5_
 
 - [ ] 5. SSE ブロードキャストとルールヘルプを実装する
-- [ ] 5.1 (P) SseBroadcastGateway と EventSource エンドポイントを構築する
+- [x] 5.1 (P) SseBroadcastGateway と EventSource エンドポイントを構築する
   - `GET /sessions/:id/stream` で接続を確立し、keep-alive コメントや Last-Event-ID 対応を実装する。
   - `state.delta`, `state.final`, `system.error` などイベント種別ごとに JSON ペイロードを生成する。
   - _Requirements: 5.1,5.3_
@@ -84,7 +84,7 @@
   - 2〜4 人のフルゲームシナリオを自動化し、セットアップ→ターン→強制取得→終局→エクスポートまで検証する。
   - SSE 接続の再接続テストや Last-Event-ID 再送を実装し、ログ欠損・エラー発生時の復旧を確認する。
   - _Requirements: 2.5,4.5,5.1,5.2,5.3,5.5_
-- [ ]\* 7.3 負荷・パフォーマンステストをオプションで実施する
+- [ ] 7.3 負荷・パフォーマンステストをオプションで実施する
   - 50 セッション並列処理や 500 SSE クライアントでの fan-out をシミュレートし、ボトルネックを測定する。
   - TimerSupervisor の大量登録やエクスポート大量実行でのリソース挙動を記録して将来の横展開に備える。
   - _Requirements: 2.5,5.1,5.2_

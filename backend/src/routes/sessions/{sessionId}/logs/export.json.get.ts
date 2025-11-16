@@ -1,6 +1,6 @@
 import { createRoute, z } from '@hono/zod-openapi';
-import { errorResponseSchema } from 'schema/sessions.js';
 import { handleLogsJsonExport } from 'routes/sessions/{sessionId}/logs/export.js';
+import { errorResponseSchema } from 'schema/sessions.js';
 import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { SessionRouteDependencies } from 'routes/sessions/types.js';
 
@@ -10,10 +10,7 @@ const exportJsonRoute = createRoute({
   description: 'イベントログを JSON 形式でエクスポートします。',
   request: {
     params: z.object({
-      sessionId: z
-        .string()
-        .min(1)
-        .describe('対象となる `session_id`。'),
+      sessionId: z.string().min(1).describe('対象となる `session_id`。'),
     }),
   },
   responses: {
@@ -31,6 +28,11 @@ const exportJsonRoute = createRoute({
   },
 });
 
+/**
+ * ログの JSON エクスポート GET ルートを登録する。
+ * @param app ルート登録先の Hono インスタンス。
+ * @param dependencies セッションストアなどの依存性。
+ */
 export const registerLogsExportJsonRoute = (
   app: OpenAPIHono,
   dependencies: SessionRouteDependencies,

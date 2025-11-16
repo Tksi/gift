@@ -4,6 +4,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
+    "build:types": "tsc --emitDeclarationOnly --declaration --outDir dist-types",
     "start": "node dist/index.js",
     "format:check": "prettier . --cache --check --ignore-path .gitignore",
     "lint:check": "eslint **/*.{js,ts} --concurrency auto --cache --cache-location node_modules/.cache/.eslintcache",

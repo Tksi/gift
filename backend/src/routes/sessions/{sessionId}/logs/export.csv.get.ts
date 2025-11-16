@@ -1,6 +1,6 @@
 import { createRoute, z } from '@hono/zod-openapi';
-import { errorResponseSchema } from 'schema/sessions.js';
 import { handleLogsCsvExport } from 'routes/sessions/{sessionId}/logs/export.js';
+import { errorResponseSchema } from 'schema/sessions.js';
 import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { SessionRouteDependencies } from 'routes/sessions/types.js';
 
@@ -11,10 +11,7 @@ const exportCsvRoute = createRoute({
     'イベントログを CSV 形式でエクスポートします。`Content-Disposition` を設定してダウンロードを促します。',
   request: {
     params: z.object({
-      sessionId: z
-        .string()
-        .min(1)
-        .describe('対象となる `session_id`。'),
+      sessionId: z.string().min(1).describe('対象となる `session_id`。'),
     }),
   },
   responses: {
@@ -32,6 +29,11 @@ const exportCsvRoute = createRoute({
   },
 });
 
+/**
+ * ログの CSV エクスポート GET ルートを登録する。
+ * @param app ルートを登録する Hono インスタンス。
+ * @param dependencies セッションストアなどの依存性。
+ */
 export const registerLogsExportCsvRoute = (
   app: OpenAPIHono,
   dependencies: SessionRouteDependencies,

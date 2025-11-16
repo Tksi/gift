@@ -8,6 +8,11 @@ import { registerLogsExportCsvRoute } from 'routes/sessions/{sessionId}/logs/exp
 import { registerLogsExportJsonRoute } from 'routes/sessions/{sessionId}/logs/export.json.get.js';
 import { registerSessionResultsGetRoute } from 'routes/sessions/{sessionId}/results.get.js';
 import { registerSessionStateGetRoute } from 'routes/sessions/{sessionId}/state.get.js';
+import { registerSessionStreamGetRoute } from 'routes/sessions/{sessionId}/stream.get.js';
+import {
+  type SseBroadcastGateway,
+  createSseBroadcastGateway,
+} from 'services/sseBroadcastGateway.js';
 import { createTimeoutCommandHandler } from 'services/systemTimeoutHandler.js';
 import {
   type TimerSupervisor,
@@ -24,6 +29,7 @@ export type CreateAppOptions = {
   generateSessionId?: () => string;
   timerSupervisor?: TimerSupervisor;
   turnTimeoutMs?: number;
+  sseGateway?: SseBroadcastGateway;
 };
 
 const noopTimeoutHandler = (): void => undefined;
@@ -39,6 +45,7 @@ export const createApp = (options: CreateAppOptions = {}) => {
   const now = options.now ?? (() => new Date().toISOString());
   const generateSessionId = options.generateSessionId ?? (() => randomUUID());
   const turnTimeoutMs = options.turnTimeoutMs ?? 45_000;
+  const sseGateway = options.sseGateway ?? createSseBroadcastGateway();
   let timeoutHandler: (sessionId: string) => Promise<void> | void =
     noopTimeoutHandler;
   const timerSupervisor =
@@ -63,6 +70,7 @@ export const createApp = (options: CreateAppOptions = {}) => {
     timeoutHandler = createTimeoutCommandHandler({
       store,
       turnService,
+      sseGateway,
     });
   }
 
@@ -73,6 +81,7 @@ export const createApp = (options: CreateAppOptions = {}) => {
     turnService,
     timerSupervisor,
     turnTimeoutMs,
+    sseGateway,
   };
 
   timerSupervisor.restore();
@@ -80,6 +89,7 @@ export const createApp = (options: CreateAppOptions = {}) => {
   registerSessionPostRoute(sessionsApp, sessionDependencies);
   registerSessionGetRoute(sessionsApp, sessionDependencies);
   registerSessionStateGetRoute(sessionsApp, sessionDependencies);
+  registerSessionStreamGetRoute(sessionsApp, sessionDependencies);
   registerSessionActionsPostRoute(sessionsApp, sessionDependencies);
   registerSessionResultsGetRoute(sessionsApp, sessionDependencies);
   registerLogsExportCsvRoute(sessionsApp, sessionDependencies);

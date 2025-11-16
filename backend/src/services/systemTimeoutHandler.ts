@@ -1,3 +1,5 @@
+import { publishStateEvents } from 'services/ssePublisher.js';
+import type { SseBroadcastGateway } from 'services/sseBroadcastGateway.js';
 import type { TurnDecisionService } from 'services/turnDecision.js';
 import type {
   GameSnapshot,
@@ -7,6 +9,7 @@ import type {
 export type TimeoutCommandHandlerDependencies = {
   store: InMemoryGameStore;
   turnService: TurnDecisionService;
+  sseGateway?: SseBroadcastGateway;
   generateCommandId?: (snapshot: GameSnapshot) => string;
 };
 
@@ -38,13 +41,19 @@ export const createTimeoutCommandHandler = (
     }
 
     try {
-      await dependencies.turnService.applyCommand({
+      const result = await dependencies.turnService.applyCommand({
         sessionId,
         commandId: generateCommandId(snapshot),
         expectedVersion: envelope.version,
         playerId: 'system',
         action: 'takeCard',
       });
+
+      publishStateEvents(
+        dependencies.sseGateway,
+        result.snapshot,
+        result.version,
+      );
     } catch {
       // 最新バージョンとの差異や競合が発生した場合は黙って終了する。
     }

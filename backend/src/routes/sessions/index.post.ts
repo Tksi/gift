@@ -8,6 +8,7 @@ import {
   errorResponseSchema,
   sessionResponseSchema,
 } from 'schema/sessions.js';
+import { publishStateEvents } from 'services/ssePublisher.js';
 import { calculateTurnDeadline } from 'services/timerSupervisor.js';
 import { createSetupSnapshot } from 'states/setup.js';
 import type { OpenAPIHono } from '@hono/zod-openapi';
@@ -220,6 +221,12 @@ export const registerSessionPostRoute = (
       } else {
         dependencies.timerSupervisor.clear(sessionId);
       }
+
+      publishStateEvents(
+        dependencies.sseGateway,
+        envelope.snapshot,
+        envelope.version,
+      );
 
       return c.json(toSessionResponse(envelope), 201);
     }

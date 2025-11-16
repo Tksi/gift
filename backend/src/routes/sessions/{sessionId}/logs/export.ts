@@ -54,6 +54,11 @@ const createCsvBody = (
 const respondMissingSession = (c: Context) =>
   respondNotFound(c, 'SESSION_NOT_FOUND', 'Session does not exist.');
 
+/**
+ * イベントログを CSV へ整形しレスポンスへ書き込む。
+ * @param c Hono コンテキスト。
+ * @param dependencies セッションストアなどの依存性。
+ */
 export const handleLogsCsvExport = (
   c: Context,
   dependencies: SessionRouteDependencies,
@@ -75,6 +80,11 @@ export const handleLogsCsvExport = (
   return c.body(csv, 200);
 };
 
+/**
+ * イベントログを JSON 形式で返す。
+ * @param c Hono コンテキスト。
+ * @param dependencies セッションストアなどの依存性。
+ */
 export const handleLogsJsonExport = (
   c: Context,
   dependencies: SessionRouteDependencies,

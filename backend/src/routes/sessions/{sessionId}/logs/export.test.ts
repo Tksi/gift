@@ -1,5 +1,8 @@
 import { createApp } from 'app.js';
-import { createInMemoryGameStore } from 'states/inMemoryGameStore.js';
+import {
+  type EventLogEntry,
+  createInMemoryGameStore,
+} from 'states/inMemoryGameStore.js';
 import { describe, expect, it } from 'vitest';
 
 const createTestApp = () => {
@@ -7,6 +10,11 @@ const createTestApp = () => {
   const app = createApp({ store });
 
   return { app, store };
+};
+
+type LogsJsonExportResponse = {
+  session_id: string;
+  event_log: EventLogEntry[];
 };
 
 const seedSession = (store: ReturnType<typeof createInMemoryGameStore>) => {
@@ -58,9 +66,7 @@ describe('ログエクスポート API', () => {
     const { app, store } = createTestApp();
     seedSession(store);
 
-    const response = await app.request(
-      '/sessions/session-log/logs/export.csv',
-    );
+    const response = await app.request('/sessions/session-log/logs/export.csv');
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toContain('text/csv');
     expect(response.headers.get('content-disposition')).toContain('.csv');
@@ -78,7 +84,7 @@ describe('ログエクスポート API', () => {
     );
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toContain('application/json');
-    const payload = await response.json();
+    const payload = (await response.json()) as LogsJsonExportResponse;
     expect(Array.isArray(payload.event_log)).toBe(true);
     expect(payload.event_log).toHaveLength(2);
   });

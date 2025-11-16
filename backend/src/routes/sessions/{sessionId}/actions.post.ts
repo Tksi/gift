@@ -4,6 +4,7 @@ import {
   sessionActionBodySchema,
   sessionActionResponseSchema,
 } from 'schema/sessions.js';
+import { publishStateEvents } from 'services/ssePublisher.js';
 import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { SessionRouteDependencies } from 'routes/sessions/types.js';
 import type { ServiceError } from 'services/errors.js';
@@ -119,6 +120,12 @@ export const registerSessionActionsPostRoute = (
         playerId: payload.player_id,
         action: payload.action,
       });
+
+      publishStateEvents(
+        dependencies.sseGateway,
+        result.snapshot,
+        result.version,
+      );
 
       return c.json(toActionResponse(result.snapshot, result.version), 200);
     } catch (err) {
