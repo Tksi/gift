@@ -48,6 +48,7 @@ const createGatewayStub = () => {
   const publishStateDelta = vi.fn();
   const publishStateFinal = vi.fn();
   const publishSystemError = vi.fn();
+  const publishRuleHint = vi.fn();
   const connect = vi.fn(() => ({ disconnect: vi.fn() }));
 
   return {
@@ -56,6 +57,7 @@ const createGatewayStub = () => {
     publishStateDelta,
     publishStateFinal,
     publishSystemError,
+    publishRuleHint,
   };
 };
 

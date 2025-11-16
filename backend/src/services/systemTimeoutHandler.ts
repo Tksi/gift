@@ -1,4 +1,5 @@
 import { publishStateEvents } from 'services/ssePublisher.js';
+import type { RuleHintService } from 'services/ruleHintService.js';
 import type { SseBroadcastGateway } from 'services/sseBroadcastGateway.js';
 import type { TurnDecisionService } from 'services/turnDecision.js';
 import type {
@@ -10,6 +11,7 @@ export type TimeoutCommandHandlerDependencies = {
   store: InMemoryGameStore;
   turnService: TurnDecisionService;
   sseGateway?: SseBroadcastGateway;
+  ruleHintService?: RuleHintService;
   generateCommandId?: (snapshot: GameSnapshot) => string;
 };
 
@@ -49,11 +51,17 @@ export const createTimeoutCommandHandler = (
         action: 'takeCard',
       });
 
-      publishStateEvents(
-        dependencies.sseGateway,
-        result.snapshot,
-        result.version,
-      );
+      const eventOptions: Parameters<typeof publishStateEvents>[0] = {};
+
+      if (dependencies.sseGateway) {
+        eventOptions.sseGateway = dependencies.sseGateway;
+      }
+
+      if (dependencies.ruleHintService) {
+        eventOptions.ruleHints = dependencies.ruleHintService;
+      }
+
+      publishStateEvents(eventOptions, result.snapshot, result.version);
     } catch {
       // 最新バージョンとの差異や競合が発生した場合は黙って終了する。
     }

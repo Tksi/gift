@@ -100,6 +100,23 @@ const readNextDataEvent = async (
   }
 };
 
+const readNextEventOfType = async (
+  reader: ReturnType<typeof createSseEventReader>,
+  type: string,
+) => {
+  while (true) {
+    const event = await readNextDataEvent(reader);
+
+    if (!event) {
+      return null;
+    }
+
+    if (event.event === type) {
+      return event;
+    }
+  }
+};
+
 const createSession = async () => {
   const app = createApp({
     now: () => '2025-01-01T00:00:00.000Z',
@@ -125,7 +142,7 @@ const createSession = async () => {
 };
 
 describe('GET /sessions/{sessionId}/stream', () => {
-  it('最新状態を state.delta イベントとして送信する', async () => {
+  it('最新状態を state.delta と rule.hint イベントとして送信する', async () => {
     const { app, session } = await createSession();
     const response = await app.request(
       `/sessions/${session.session_id}/stream`,
@@ -142,18 +159,32 @@ describe('GET /sessions/{sessionId}/stream', () => {
     }
 
     const reader = createSseEventReader(body);
-    const event = await readNextDataEvent(reader);
+    const stateEvent = await readNextDataEvent(reader);
 
-    expect(event).not.toBeNull();
+    expect(stateEvent).not.toBeNull();
 
-    if (!event) {
+    if (!stateEvent) {
       return;
     }
 
-    expect(event.event).toBe('state.delta');
-    const data = JSON.parse(event.data) as SessionResponse;
+    expect(stateEvent.event).toBe('state.delta');
+    const data = JSON.parse(stateEvent.data) as SessionResponse;
     expect(data.session_id).toBe(session.session_id);
     expect(data.state_version).toBe(session.state_version);
+
+    const hintEvent = await readNextDataEvent(reader);
+
+    expect(hintEvent).not.toBeNull();
+
+    if (!hintEvent) {
+      return;
+    }
+
+    expect(hintEvent.event).toBe('rule.hint');
+    const hintPayload = JSON.parse(hintEvent.data) as {
+      hint: { text: string };
+    };
+    expect(hintPayload.hint.text).toContain('カード');
     await reader.cancel();
   });
 
@@ -170,6 +201,7 @@ describe('GET /sessions/{sessionId}/stream', () => {
     }
 
     const reader = createSseEventReader(body);
+    await readNextDataEvent(reader);
     await readNextDataEvent(reader);
 
     const actorId = session.state.turnState.currentPlayerId;
@@ -220,6 +252,16 @@ describe('GET /sessions/{sessionId}/stream', () => {
     expect(stateEvent.event).toBe('state.delta');
     const data = JSON.parse(stateEvent.data) as SessionResponse;
     expect(data.state_version).not.toBe(session.state_version);
+
+    const hintEvent = await readNextDataEvent(reader);
+
+    expect(hintEvent).not.toBeNull();
+
+    if (!hintEvent) {
+      return;
+    }
+
+    expect(hintEvent.event).toBe('rule.hint');
     await reader.cancel();
   });
 
@@ -283,7 +325,8 @@ describe('GET /sessions/{sessionId}/stream', () => {
     );
     const initialReader = createSseEventReader(firstResponse.body!);
     await readNextDataEvent(initialReader);
-    const firstLog = await readNextDataEvent(initialReader);
+    await readNextDataEvent(initialReader);
+    const firstLog = await readNextEventOfType(initialReader, 'event.log');
     await initialReader.cancel();
 
     if (!firstLog) {
@@ -301,7 +344,8 @@ describe('GET /sessions/{sessionId}/stream', () => {
 
     const reader = createSseEventReader(reconnectResponse.body!);
     await readNextDataEvent(reader);
-    const replayedLog = await readNextDataEvent(reader);
+    await readNextDataEvent(reader);
+    const replayedLog = await readNextEventOfType(reader, 'event.log');
 
     expect(replayedLog).not.toBeNull();
 

@@ -122,7 +122,10 @@ export const registerSessionActionsPostRoute = (
       });
 
       publishStateEvents(
-        dependencies.sseGateway,
+        {
+          sseGateway: dependencies.sseGateway,
+          ruleHints: dependencies.ruleHintService,
+        },
         result.snapshot,
         result.version,
       );

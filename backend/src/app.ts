@@ -3,6 +3,7 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import { Scalar } from '@scalar/hono-api-reference';
 import { registerSessionPostRoute } from 'routes/sessions/index.post.js';
 import { registerSessionActionsPostRoute } from 'routes/sessions/{sessionId}/actions.post.js';
+import { registerSessionHintGetRoute } from 'routes/sessions/{sessionId}/hint.get.js';
 import { registerSessionGetRoute } from 'routes/sessions/{sessionId}/index.get.js';
 import { registerLogsExportCsvRoute } from 'routes/sessions/{sessionId}/logs/export.csv.get.js';
 import { registerLogsExportJsonRoute } from 'routes/sessions/{sessionId}/logs/export.json.get.js';
@@ -13,6 +14,10 @@ import {
   type EventLogService,
   createEventLogService,
 } from 'services/eventLogService.js';
+import {
+  type RuleHintService,
+  createRuleHintService,
+} from 'services/ruleHintService.js';
 import {
   type SseBroadcastGateway,
   createSseBroadcastGateway,
@@ -35,6 +40,7 @@ export type CreateAppOptions = {
   turnTimeoutMs?: number;
   sseGateway?: SseBroadcastGateway;
   eventLogService?: EventLogService;
+  ruleHintService?: RuleHintService;
 };
 
 const noopTimeoutHandler = (): void => undefined;
@@ -51,6 +57,11 @@ export const createApp = (options: CreateAppOptions = {}) => {
   const generateSessionId = options.generateSessionId ?? (() => randomUUID());
   const turnTimeoutMs = options.turnTimeoutMs ?? 45_000;
   const sseGateway = options.sseGateway ?? createSseBroadcastGateway();
+  const ruleHintService =
+    options.ruleHintService ??
+    createRuleHintService({
+      now,
+    });
   const eventLogService =
     options.eventLogService ??
     createEventLogService({
@@ -83,6 +94,7 @@ export const createApp = (options: CreateAppOptions = {}) => {
       store,
       turnService,
       sseGateway,
+      ruleHintService,
     });
   }
 
@@ -95,6 +107,7 @@ export const createApp = (options: CreateAppOptions = {}) => {
     turnTimeoutMs,
     sseGateway,
     eventLogService,
+    ruleHintService,
   };
 
   timerSupervisor.restore();
@@ -102,6 +115,7 @@ export const createApp = (options: CreateAppOptions = {}) => {
   registerSessionPostRoute(sessionsApp, sessionDependencies);
   registerSessionGetRoute(sessionsApp, sessionDependencies);
   registerSessionStateGetRoute(sessionsApp, sessionDependencies);
+  registerSessionHintGetRoute(sessionsApp, sessionDependencies);
   registerSessionStreamGetRoute(sessionsApp, sessionDependencies);
   registerSessionActionsPostRoute(sessionsApp, sessionDependencies);
   registerSessionResultsGetRoute(sessionsApp, sessionDependencies);

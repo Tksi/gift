@@ -1,5 +1,5 @@
 import { z } from '@hono/zod-openapi';
-import { scoreSummarySchema, snapshotSchema } from './game.js';
+import { ruleHintSchema, scoreSummarySchema, snapshotSchema } from './game.js';
 import { playerRegistrationSchema } from './players.js';
 
 export const createSessionBodySchema = z.object({
@@ -117,5 +117,20 @@ export const sessionResultsResponseSchema = z.object({
   }),
   event_log: z.array(eventLogEntrySchema).openapi({
     description: 'ターン順に並んだイベントログ。',
+  }),
+});
+
+export const sessionHintResponseSchema = z.object({
+  session_id: z.string().openapi({
+    description: '対象セッションの ID。',
+  }),
+  state_version: z.string().openapi({
+    description: '現在の状態バージョン。',
+  }),
+  generated_from_version: z.string().openapi({
+    description: 'ヒント作成時点での状態バージョン。',
+  }),
+  hint: ruleHintSchema.openapi({
+    description: '最新のルールヘルプ。',
   }),
 });

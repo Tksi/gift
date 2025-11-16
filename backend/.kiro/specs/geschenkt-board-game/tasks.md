@@ -60,7 +60,7 @@
   - 行動ログに `turn`, `actor`, `action`, `chipsDelta` を保存し、SSE から `event.log` として配信する。
   - 再接続時は `EventLogEntry` の ID を基に差分を抽出し、抜け漏れを埋める。
   - _Requirements: 5.2,5.5_
-- [ ] 5.3 (P) RuleHintService とルールヘルプ API を実装する
+- [x] 5.3 (P) RuleHintService とルールヘルプ API を実装する
   - 現在カード・中央チップ・プレイヤー手札を参照してテキストヒントを生成し、SSE `rule.hint` と `GET /sessions/:id/hint` で返す。
   - 生成元の `state_version` を付与し、古いヒントが表示されないようにする。
   - _Requirements: 5.4_

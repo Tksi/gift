@@ -223,7 +223,10 @@ export const registerSessionPostRoute = (
       }
 
       publishStateEvents(
-        dependencies.sseGateway,
+        {
+          sseGateway: dependencies.sseGateway,
+          ruleHints: dependencies.ruleHintService,
+        },
         envelope.snapshot,
         envelope.version,
       );
