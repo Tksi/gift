@@ -4,6 +4,14 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-10-19',
   devtools: { enabled: false },
   ssr: false,
+  alias: {
+    '@backend': '../backend/dist',
+  },
+  runtimeConfig: {
+    public: {
+      apiBase: 'http://localhost:3000',
+    },
+  },
   experimental: {
     typedPages: true,
   },

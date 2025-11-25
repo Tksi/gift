@@ -2,14 +2,14 @@
 
 ## Task 1: プロジェクト基盤とAPI通信層の構築
 
-- [ ] 1.1 バックエンド型定義参照とHono RPCクライアントのセットアップ
+- [x] 1.1 バックエンド型定義参照とHono RPCクライアントのセットアップ
   - `nuxt.config.ts` にバックエンドソースへのエイリアス設定を追加
   - `tsconfig.json` にパスマッピングを追加
   - `hono` パッケージがインストール済みであることを確認
   - 型参照が正しく解決されることを `nuxi typecheck` で検証
   - _Requirements: 1.5_
 
-- [ ] 1.2 (P) API通信用Composableの実装
+- [x] 1.2 (P) API通信用Composableの実装
   - Hono RPCクライアントを初期化するComposableを作成
   - 環境変数からベースURLを取得し、型安全なクライアントを返却
   - 各APIメソッドの型推論が正しく機能することを確認
