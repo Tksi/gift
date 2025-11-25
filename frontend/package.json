@@ -1,0 +1,28 @@
+{
+  "name": "nuxt-app",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "format:check": "prettier . --cache --check --ignore-path .gitignore",
+    "lint:check": "eslint **/*.{js,ts,vue} --concurrency auto --cache --cache-location node_modules/.cache/.eslintcache",
+    "type:check": "nuxi typecheck",
+    "checkall": "npm run format:check && npm run lint:check && npm run type:check",
+    "fix": "prettier . --cache --write --log-level warn --ignore-path .gitignore; npm run lint:check -- --fix; npm run type:check"
+  },
+  "dependencies": {
+    "@nuxt/eslint": "^1.9.0",
+    "nuxt": "^3.19.3",
+    "vue": "latest"
+  },
+  "devDependencies": {
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-jsdoc": "^61.1.4",
+    "prettier": "^3.6.2",
+    "vue-tsc": "^3.1.1"
+  }
+}
