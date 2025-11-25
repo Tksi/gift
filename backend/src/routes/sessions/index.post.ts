@@ -4,6 +4,10 @@ import {
   toSessionResponse,
 } from 'routes/sessions/shared.js';
 import {
+  type SessionRouteDependencies,
+  createSessionDepsMiddleware,
+} from 'routes/sessions/types.js';
+import {
   createSessionBodySchema,
   errorResponseSchema,
   sessionResponseSchema,
@@ -12,7 +16,6 @@ import { publishStateEvents } from 'services/ssePublisher.js';
 import { calculateTurnDeadline } from 'services/timerSupervisor.js';
 import { createSetupSnapshot } from 'states/setup.js';
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { SessionRouteDependencies } from 'routes/sessions/types.js';
 import type { PlayerRegistration } from 'schema/players.js';
 import type { GameSnapshot, PlayerSummary } from 'states/inMemoryGameStore.js';
 
@@ -20,50 +23,56 @@ const MIN_PLAYERS = 2;
 const MAX_PLAYERS = 7;
 const INITIAL_PLAYER_CHIPS = 11;
 
-const createSessionRoute = createRoute({
-  method: 'post',
-  path: '/sessions',
-  description:
-    '指定されたプレイヤー情報と任意のシード値を用いてゲームのセットアップを実行し、初期スナップショットと状態バージョンを返します。',
-  request: {
-    body: {
-      required: true,
-      content: {
-        'application/json': {
-          schema: createSessionBodySchema,
-          example: {
-            seed: 'optional-seed-string',
-            players: [
-              { id: 'alice', display_name: 'Alice' },
-              { id: 'bob', display_name: 'Bob' },
-            ],
+/**
+ * 依存注入ミドルウェア付きのルート定義を生成する。
+ * @param deps セッションルートに必要な依存オブジェクト。
+ */
+const createSessionRouteWithMiddleware = (deps: SessionRouteDependencies) =>
+  createRoute({
+    method: 'post',
+    path: '/sessions',
+    description:
+      '指定されたプレイヤー情報と任意のシード値を用いてゲームのセットアップを実行し、初期スナップショットと状態バージョンを返します。',
+    middleware: [createSessionDepsMiddleware(deps)] as const,
+    request: {
+      body: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: createSessionBodySchema,
+            example: {
+              seed: 'optional-seed-string',
+              players: [
+                { id: 'alice', display_name: 'Alice' },
+                { id: 'bob', display_name: 'Bob' },
+              ],
+            },
+          },
+        },
+        description:
+          'プレイヤー ID と表示名、そして任意の乱数シード。ID は 2〜7 名、英数 + `_`/`-` のみ許可されます。',
+      },
+    },
+    responses: {
+      201: {
+        description: '新しいセッションが作成され、初期状態が返却されました。',
+        content: {
+          'application/json': {
+            schema: sessionResponseSchema,
           },
         },
       },
-      description:
-        'プレイヤー ID と表示名、そして任意の乱数シード。ID は 2〜7 名、英数 + `_`/`-` のみ許可されます。',
-    },
-  },
-  responses: {
-    201: {
-      description: '新しいセッションが作成され、初期状態が返却されました。',
-      content: {
-        'application/json': {
-          schema: sessionResponseSchema,
+      422: {
+        description:
+          '入力検証に失敗しました。プレイヤー人数や ID の重複などを `error.code` で示します。',
+        content: {
+          'application/json': {
+            schema: errorResponseSchema,
+          },
         },
       },
     },
-    422: {
-      description:
-        '入力検証に失敗しました。プレイヤー人数や ID の重複などを `error.code` で示します。',
-      content: {
-        'application/json': {
-          schema: errorResponseSchema,
-        },
-      },
-    },
-  },
-});
+  });
 
 type NormalizedPlayer = PlayerSummary;
 
@@ -186,29 +195,32 @@ export const registerSessionPostRoute = (
   app: OpenAPIHono,
   dependencies: SessionRouteDependencies,
 ) => {
-  app.openapi(createSessionRoute, (c) => {
+  const route = createSessionRouteWithMiddleware(dependencies);
+
+  app.openapi(route, (c) => {
+    const deps = c.var.deps;
     const payload = c.req.valid('json');
     const check = ensurePlayerConstraints(payload.players);
 
     if (check.ok) {
-      const sessionId = dependencies.generateSessionId();
+      const sessionId = deps.generateSessionId();
       const snapshot = createInitialSnapshot(
         sessionId,
         check.players,
-        dependencies.now(),
+        deps.now(),
         payload.seed,
       );
 
       if (snapshot.turnState.awaitingAction) {
         snapshot.turnState.deadline = calculateTurnDeadline(
           snapshot.updatedAt,
-          dependencies.turnTimeoutMs,
+          deps.turnTimeoutMs,
         );
       } else {
         snapshot.turnState.deadline = null;
       }
 
-      const envelope = dependencies.store.saveSnapshot(snapshot);
+      const envelope = deps.store.saveSnapshot(snapshot);
 
       const initialDeadline = snapshot.turnState.deadline;
 
@@ -217,15 +229,15 @@ export const registerSessionPostRoute = (
         initialDeadline !== null &&
         initialDeadline !== undefined
       ) {
-        dependencies.timerSupervisor.register(sessionId, initialDeadline);
+        deps.timerSupervisor.register(sessionId, initialDeadline);
       } else {
-        dependencies.timerSupervisor.clear(sessionId);
+        deps.timerSupervisor.clear(sessionId);
       }
 
       publishStateEvents(
         {
-          sseGateway: dependencies.sseGateway,
-          ruleHints: dependencies.ruleHintService,
+          sseGateway: deps.sseGateway,
+          ruleHints: deps.ruleHintService,
         },
         envelope.snapshot,
         envelope.version,

@@ -1,48 +1,57 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { respondNotFound, toSessionResponse } from 'routes/sessions/shared.js';
+import {
+  type SessionRouteDependencies,
+  createSessionDepsMiddleware,
+} from 'routes/sessions/types.js';
 import { errorResponseSchema, sessionResponseSchema } from 'schema/sessions.js';
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { SessionRouteDependencies } from 'routes/sessions/types.js';
 
-const getSessionStateRoute = createRoute({
-  method: 'get',
-  path: '/sessions/{sessionId}/state',
-  description:
-    'セッションの最新スナップショットを取得し、ETag でクライアントのキャッシュバージョンと突き合わせます。',
-  request: {
-    params: z.object({
-      sessionId: z
-        .string()
-        .min(1)
-        .describe(
-          '状態を取得する `session_id`。初期作成レスポンスで受け取った値を指定します。',
-        ),
-    }),
-  },
-  responses: {
-    200: {
-      description:
-        'セッションが存在し、最新スナップショットとバージョンが返却されました。',
-      content: {
-        'application/json': {
-          schema: sessionResponseSchema,
+/**
+ * 依存注入ミドルウェア付きのルート定義を生成する。
+ * @param deps セッションルートに必要な依存オブジェクト。
+ */
+const createGetSessionStateRoute = (deps: SessionRouteDependencies) =>
+  createRoute({
+    method: 'get',
+    path: '/sessions/{sessionId}/state',
+    middleware: [createSessionDepsMiddleware(deps)] as const,
+    description:
+      'セッションの最新スナップショットを取得し、ETag でクライアントのキャッシュバージョンと突き合わせます。',
+    request: {
+      params: z.object({
+        sessionId: z
+          .string()
+          .min(1)
+          .describe(
+            '状態を取得する `session_id`。初期作成レスポンスで受け取った値を指定します。',
+          ),
+      }),
+    },
+    responses: {
+      200: {
+        description:
+          'セッションが存在し、最新スナップショットとバージョンが返却されました。',
+        content: {
+          'application/json': {
+            schema: sessionResponseSchema,
+          },
+        },
+      },
+      304: {
+        description:
+          '送信された `If-None-Match` が最新バージョンと一致したため、キャッシュ済みデータを再利用できます。',
+      },
+      404: {
+        description: '指定された `session_id` のデータが存在しません。',
+        content: {
+          'application/json': {
+            schema: errorResponseSchema,
+          },
         },
       },
     },
-    304: {
-      description:
-        '送信された `If-None-Match` が最新バージョンと一致したため、キャッシュ済みデータを再利用できます。',
-    },
-    404: {
-      description: '指定された `session_id` のデータが存在しません。',
-      content: {
-        'application/json': {
-          schema: errorResponseSchema,
-        },
-      },
-    },
-  },
-});
+  });
 
 const formatEtag = (version: string): string => `"${version}"`;
 
@@ -113,9 +122,12 @@ export const registerSessionStateGetRoute = (
   app: OpenAPIHono,
   dependencies: SessionRouteDependencies,
 ) => {
-  app.openapi(getSessionStateRoute, (c) => {
+  const route = createGetSessionStateRoute(dependencies);
+
+  app.openapi(route, (c) => {
+    const deps = c.var.deps;
     const { sessionId } = c.req.valid('param');
-    const envelope = dependencies.store.getEnvelope(sessionId);
+    const envelope = deps.store.getEnvelope(sessionId);
 
     if (!envelope) {
       return respondNotFound(c, 'SESSION_NOT_FOUND', 'Session does not exist.');

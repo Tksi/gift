@@ -1,43 +1,52 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { streamSSE } from 'hono/streaming';
 import { respondNotFound } from 'routes/sessions/shared.js';
+import {
+  type SessionRouteDependencies,
+  createSessionDepsMiddleware,
+} from 'routes/sessions/types.js';
 import { errorResponseSchema } from 'schema/sessions.js';
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { SessionRouteDependencies } from 'routes/sessions/types.js';
 import type { SseEventPayload } from 'services/sseBroadcastGateway.js';
 
 const KEEP_ALIVE_INTERVAL_MS = 15_000;
 
-const sessionStreamRoute = createRoute({
-  method: 'get',
-  path: '/sessions/{sessionId}/stream',
-  description:
-    '指定したセッションの状態更新を SSE (Server-Sent Events) で購読します。`Last-Event-ID` を送ると未取得イベントを再送します。',
-  request: {
-    params: z.object({
-      sessionId: z
-        .string()
-        .min(1)
-        .describe(
-          'SSE で監視する `session_id`。プレイヤー登録レスポンスで受け取った値を指定します。',
-        ),
-    }),
-  },
-  responses: {
-    200: {
-      description:
-        'SSE ストリームが確立され、`state.delta` や `state.final` などのイベントが配信されます。',
+/**
+ * 依存注入ミドルウェア付きのルート定義を生成する。
+ * @param deps セッションルートに必要な依存オブジェクト。
+ */
+const createSessionStreamRoute = (deps: SessionRouteDependencies) =>
+  createRoute({
+    method: 'get',
+    path: '/sessions/{sessionId}/stream',
+    middleware: [createSessionDepsMiddleware(deps)] as const,
+    description:
+      '指定したセッションの状態更新を SSE (Server-Sent Events) で購読します。`Last-Event-ID` を送ると未取得イベントを再送します。',
+    request: {
+      params: z.object({
+        sessionId: z
+          .string()
+          .min(1)
+          .describe(
+            'SSE で監視する `session_id`。プレイヤー登録レスポンスで受け取った値を指定します。',
+          ),
+      }),
     },
-    404: {
-      description: 'セッションが見つかりません。',
-      content: {
-        'application/json': {
-          schema: errorResponseSchema,
+    responses: {
+      200: {
+        description:
+          'SSE ストリームが確立され、`state.delta` や `state.final` などのイベントが配信されます。',
+      },
+      404: {
+        description: 'セッションが見つかりません。',
+        content: {
+          'application/json': {
+            schema: errorResponseSchema,
+          },
         },
       },
     },
-  },
-});
+  });
 
 const formatPayload = (event: SseEventPayload) => ({
   id: event.id,
@@ -54,16 +63,19 @@ export const registerSessionStreamGetRoute = (
   app: OpenAPIHono,
   dependencies: SessionRouteDependencies,
 ) => {
-  app.openapi(sessionStreamRoute, (c) => {
+  const route = createSessionStreamRoute(dependencies);
+
+  app.openapi(route, (c) => {
+    const deps = c.var.deps;
     const { sessionId } = c.req.valid('param');
-    const envelope = dependencies.store.getEnvelope(sessionId);
+    const envelope = deps.store.getEnvelope(sessionId);
 
     if (!envelope) {
       return respondNotFound(c, 'SESSION_NOT_FOUND', 'Session does not exist.');
     }
 
     const lastEventIdHeader = c.req.header('last-event-id');
-    const logReplayAfterId = dependencies.eventLogService.isEventLogId(
+    const logReplayAfterId = deps.eventLogService.isEventLogId(
       lastEventIdHeader ?? null,
     )
       ? (lastEventIdHeader ?? undefined)
@@ -90,9 +102,7 @@ export const registerSessionStreamGetRoute = (
           void stream.writeSSE(formatPayload(event));
         };
 
-        const connectOptions: Parameters<
-          typeof dependencies.sseGateway.connect
-        >[0] = {
+        const connectOptions: Parameters<typeof deps.sseGateway.connect>[0] = {
           sessionId,
           send,
         };
@@ -104,14 +114,14 @@ export const registerSessionStreamGetRoute = (
           connectOptions.lastEventId = lastEventIdHeader;
         }
 
-        connection = dependencies.sseGateway.connect(connectOptions);
+        connection = deps.sseGateway.connect(connectOptions);
 
         keepAliveHandle = setInterval(() => {
           void stream.write(': keep-alive\n\n');
         }, KEEP_ALIVE_INTERVAL_MS);
 
         const replayInput: Parameters<
-          typeof dependencies.eventLogService.replayEntries
+          typeof deps.eventLogService.replayEntries
         >[0] = {
           sessionId,
           send: (entry) =>
@@ -126,7 +136,7 @@ export const registerSessionStreamGetRoute = (
           replayInput.lastEventId = logReplayAfterId;
         }
 
-        await dependencies.eventLogService.replayEntries(replayInput);
+        await deps.eventLogService.replayEntries(replayInput);
         await new Promise<void>((resolve) => {
           stream.onAbort(() => {
             cleanup();

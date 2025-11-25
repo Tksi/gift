@@ -1,7 +1,9 @@
 import { serve } from "@hono/node-server";
+import { hc } from "hono/client";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import { Scalar } from "@scalar/hono-api-reference";
+import { createMiddleware } from "hono/factory";
 import { streamSSE } from "hono/streaming";
 
 //#region src/services/errors.ts
@@ -96,6 +98,18 @@ const respondNotFound = (c, code, message) => c.json(createErrorResponseBody({
 	message,
 	status: 404
 }), 404);
+
+//#endregion
+//#region src/routes/sessions/types.ts
+/**
+* 依存注入ミドルウェアを生成するファクトリ。
+* createRoute の middleware プロパティで使用する。
+* @param deps セッションルートに必要な依存オブジェクト。
+*/
+const createSessionDepsMiddleware = (deps) => createMiddleware(async (c, next) => {
+	c.set("deps", deps);
+	await next();
+});
 
 //#endregion
 //#region src/schema/players.ts
@@ -377,10 +391,15 @@ const createSetupSnapshot = (playerIds, options = {}) => {
 const MIN_PLAYERS = 2;
 const MAX_PLAYERS = 7;
 const INITIAL_PLAYER_CHIPS = 11;
-const createSessionRoute = createRoute({
+/**
+* 依存注入ミドルウェア付きのルート定義を生成する。
+* @param deps セッションルートに必要な依存オブジェクト。
+*/
+const createSessionRouteWithMiddleware = (deps) => createRoute({
 	method: "post",
 	path: "/sessions",
 	description: "指定されたプレイヤー情報と任意のシード値を用いてゲームのセットアップを実行し、初期スナップショットと状態バージョンを返します。",
+	middleware: [createSessionDepsMiddleware(deps)],
 	request: { body: {
 		required: true,
 		content: { "application/json": {
@@ -488,21 +507,23 @@ const createInitialSnapshot = (sessionId, players, timestamp, seed) => {
 * @param dependencies ストアや時刻生成などの依存オブジェクト。
 */
 const registerSessionPostRoute = (app$1, dependencies) => {
-	app$1.openapi(createSessionRoute, (c) => {
+	const route = createSessionRouteWithMiddleware(dependencies);
+	app$1.openapi(route, (c) => {
+		const deps = c.var.deps;
 		const payload = c.req.valid("json");
 		const check = ensurePlayerConstraints(payload.players);
 		if (check.ok) {
-			const sessionId = dependencies.generateSessionId();
-			const snapshot = createInitialSnapshot(sessionId, check.players, dependencies.now(), payload.seed);
-			if (snapshot.turnState.awaitingAction) snapshot.turnState.deadline = calculateTurnDeadline(snapshot.updatedAt, dependencies.turnTimeoutMs);
+			const sessionId = deps.generateSessionId();
+			const snapshot = createInitialSnapshot(sessionId, check.players, deps.now(), payload.seed);
+			if (snapshot.turnState.awaitingAction) snapshot.turnState.deadline = calculateTurnDeadline(snapshot.updatedAt, deps.turnTimeoutMs);
 			else snapshot.turnState.deadline = null;
-			const envelope = dependencies.store.saveSnapshot(snapshot);
+			const envelope = deps.store.saveSnapshot(snapshot);
 			const initialDeadline = snapshot.turnState.deadline;
-			if (snapshot.turnState.awaitingAction && initialDeadline !== null && initialDeadline !== void 0) dependencies.timerSupervisor.register(sessionId, initialDeadline);
-			else dependencies.timerSupervisor.clear(sessionId);
+			if (snapshot.turnState.awaitingAction && initialDeadline !== null && initialDeadline !== void 0) deps.timerSupervisor.register(sessionId, initialDeadline);
+			else deps.timerSupervisor.clear(sessionId);
 			publishStateEvents({
-				sseGateway: dependencies.sseGateway,
-				ruleHints: dependencies.ruleHintService
+				sseGateway: deps.sseGateway,
+				ruleHints: deps.ruleHintService
 			}, envelope.snapshot, envelope.version);
 			return c.json(toSessionResponse(envelope), 201);
 		}
@@ -512,9 +533,14 @@ const registerSessionPostRoute = (app$1, dependencies) => {
 
 //#endregion
 //#region src/routes/sessions/{sessionId}/actions.post.ts
-const postSessionActionRoute = createRoute({
+/**
+* 依存注入ミドルウェア付きのルート定義を生成する。
+* @param deps セッションルートに必要な依存オブジェクト。
+*/
+const createPostSessionActionRoute = (deps) => createRoute({
 	method: "post",
 	path: "/sessions/{sessionId}/actions",
+	middleware: [createSessionDepsMiddleware(deps)],
 	description: "手番プレイヤーまたはシステムからのアクションコマンドを TurnDecisionService へ転送し、最新スナップショットと要約情報を返します。",
 	request: {
 		params: z.object({ sessionId: z.string().min(1).describe("アクションを送信する対象の `session_id`。") }),
@@ -571,11 +597,13 @@ const isServiceError = (err) => typeof err === "object" && err !== null && "code
 * @param dependencies セッションストアやサービス群。
 */
 const registerSessionActionsPostRoute = (app$1, dependencies) => {
-	app$1.openapi(postSessionActionRoute, async (c) => {
+	const route = createPostSessionActionRoute(dependencies);
+	app$1.openapi(route, async (c) => {
+		const deps = c.var.deps;
 		const { sessionId } = c.req.valid("param");
 		const payload = c.req.valid("json");
 		try {
-			const result = await dependencies.turnService.applyCommand({
+			const result = await deps.turnService.applyCommand({
 				sessionId,
 				commandId: payload.command_id,
 				expectedVersion: payload.state_version,
@@ -583,8 +611,8 @@ const registerSessionActionsPostRoute = (app$1, dependencies) => {
 				action: payload.action
 			});
 			publishStateEvents({
-				sseGateway: dependencies.sseGateway,
-				ruleHints: dependencies.ruleHintService
+				sseGateway: deps.sseGateway,
+				ruleHints: deps.ruleHintService
 			}, result.snapshot, result.version);
 			return c.json(toActionResponse(result.snapshot, result.version), 200);
 		} catch (err) {
@@ -600,7 +628,7 @@ const registerSessionActionsPostRoute = (app$1, dependencies) => {
 						message: err.message,
 						status
 					});
-					dependencies.sseGateway.publishSystemError(sessionId, body.error);
+					deps.sseGateway.publishSystemError(sessionId, body.error);
 					return c.json(body, status);
 				}
 				throw err;
@@ -612,9 +640,14 @@ const registerSessionActionsPostRoute = (app$1, dependencies) => {
 
 //#endregion
 //#region src/routes/sessions/{sessionId}/hint.get.ts
-const getSessionHintRoute = createRoute({
+/**
+* 依存注入ミドルウェア付きのルート定義を生成する。
+* @param deps セッションルートに必要な依存オブジェクト。
+*/
+const createGetSessionHintRoute = (deps) => createRoute({
 	method: "get",
 	path: "/sessions/{sessionId}/hint",
+	middleware: [createSessionDepsMiddleware(deps)],
 	description: "現在のカード・チップ状況に基づくルールヘルプを返し、UI が即時に意思決定ヒントを表示できるようにします。",
 	request: { params: z.object({ sessionId: z.string().min(1).describe("対象となる `session_id`。") }) },
 	responses: {
@@ -645,21 +678,28 @@ const toHintPayload = (sessionId, stateVersion, stored) => ({
 * @param dependencies セッションストアとサービス群。
 */
 const registerSessionHintGetRoute = (app$1, dependencies) => {
-	app$1.openapi(getSessionHintRoute, (c) => {
+	const route = createGetSessionHintRoute(dependencies);
+	app$1.openapi(route, (c) => {
+		const deps = c.var.deps;
 		const { sessionId } = c.req.valid("param");
-		const envelope = dependencies.store.getEnvelope(sessionId);
+		const envelope = deps.store.getEnvelope(sessionId);
 		if (!envelope) return respondNotFound(c, "SESSION_NOT_FOUND", "Session does not exist.");
-		const cached = dependencies.ruleHintService.getLatestHint(sessionId);
-		const latest = cached && cached.stateVersion === envelope.version ? cached : dependencies.ruleHintService.refreshHint(envelope.snapshot, envelope.version);
+		const cached = deps.ruleHintService.getLatestHint(sessionId);
+		const latest = cached && cached.stateVersion === envelope.version ? cached : deps.ruleHintService.refreshHint(envelope.snapshot, envelope.version);
 		return c.json(toHintPayload(sessionId, envelope.version, latest), 200);
 	});
 };
 
 //#endregion
 //#region src/routes/sessions/{sessionId}/index.get.ts
-const getSessionRoute = createRoute({
+/**
+* 依存注入ミドルウェア付きのルート定義を生成する。
+* @param deps セッションルートに必要な依存オブジェクト。
+*/
+const createGetSessionRoute = (deps) => createRoute({
 	method: "get",
 	path: "/sessions/{sessionId}",
+	middleware: [createSessionDepsMiddleware(deps)],
 	description: "既存セッションの最新スナップショットと状態バージョンを返し、クライアントが状態同期を行えるようにします。",
 	request: { params: z.object({ sessionId: z.string().min(1).describe("取得対象の `session_id`。作成時にレスポンスへ含まれる値を指定します。") }) },
 	responses: {
@@ -679,9 +719,11 @@ const getSessionRoute = createRoute({
 * @param dependencies ストアなどの依存オブジェクト。
 */
 const registerSessionGetRoute = (app$1, dependencies) => {
-	app$1.openapi(getSessionRoute, (c) => {
+	const route = createGetSessionRoute(dependencies);
+	app$1.openapi(route, (c) => {
+		const deps = c.var.deps;
 		const { sessionId } = c.req.valid("param");
-		const envelope = dependencies.store.getEnvelope(sessionId);
+		const envelope = deps.store.getEnvelope(sessionId);
 		if (envelope) return c.json(toSessionResponse(envelope), 200);
 		return respondNotFound(c, "SESSION_NOT_FOUND", "Session does not exist.");
 	});
@@ -762,9 +804,14 @@ const handleLogsJsonExport = (c, dependencies) => {
 
 //#endregion
 //#region src/routes/sessions/{sessionId}/logs/export.csv.get.ts
-const exportCsvRoute = createRoute({
+/**
+* 依存注入ミドルウェア付きのルート定義を生成する。
+* @param deps セッションルートに必要な依存オブジェクト。
+*/
+const createExportCsvRoute = (deps) => createRoute({
 	method: "get",
 	path: "/sessions/{sessionId}/logs/export.csv",
+	middleware: [createSessionDepsMiddleware(deps)],
 	description: "イベントログを CSV 形式でエクスポートします。`Content-Disposition` を設定してダウンロードを促します。",
 	request: { params: z.object({ sessionId: z.string().min(1).describe("対象となる `session_id`。") }) },
 	responses: {
@@ -781,14 +828,23 @@ const exportCsvRoute = createRoute({
 * @param dependencies セッションストアなどの依存性。
 */
 const registerLogsExportCsvRoute = (app$1, dependencies) => {
-	app$1.openapi(exportCsvRoute, (c) => handleLogsCsvExport(c, dependencies));
+	const route = createExportCsvRoute(dependencies);
+	app$1.openapi(route, (c) => {
+		const deps = c.var.deps;
+		return handleLogsCsvExport(c, deps);
+	});
 };
 
 //#endregion
 //#region src/routes/sessions/{sessionId}/logs/export.json.get.ts
-const exportJsonRoute = createRoute({
+/**
+* 依存注入ミドルウェア付きのルート定義を生成する。
+* @param deps セッションルートに必要な依存オブジェクト。
+*/
+const createExportJsonRoute = (deps) => createRoute({
 	method: "get",
 	path: "/sessions/{sessionId}/logs/export.json",
+	middleware: [createSessionDepsMiddleware(deps)],
 	description: "イベントログを JSON 形式でエクスポートします。",
 	request: { params: z.object({ sessionId: z.string().min(1).describe("対象となる `session_id`。") }) },
 	responses: {
@@ -805,14 +861,23 @@ const exportJsonRoute = createRoute({
 * @param dependencies セッションストアなどの依存性。
 */
 const registerLogsExportJsonRoute = (app$1, dependencies) => {
-	app$1.openapi(exportJsonRoute, (c) => handleLogsJsonExport(c, dependencies));
+	const route = createExportJsonRoute(dependencies);
+	app$1.openapi(route, (c) => {
+		const deps = c.var.deps;
+		return handleLogsJsonExport(c, deps);
+	});
 };
 
 //#endregion
 //#region src/routes/sessions/{sessionId}/results.get.ts
-const getResultsRoute = createRoute({
+/**
+* 依存注入ミドルウェア付きのルート定義を生成する。
+* @param deps セッションルートに必要な依存オブジェクト。
+*/
+const createGetResultsRoute = (deps) => createRoute({
 	method: "get",
 	path: "/sessions/{sessionId}/results",
+	middleware: [createSessionDepsMiddleware(deps)],
 	description: "ゲーム終了後の最終結果とイベントログを取得します。完了前は 409 を返します。",
 	request: { params: z.object({ sessionId: z.string().min(1).describe("結果を取得する対象の `session_id`。") }) },
 	responses: {
@@ -836,9 +901,11 @@ const getResultsRoute = createRoute({
 * @param dependencies セッションストアなどの依存性。
 */
 const registerSessionResultsGetRoute = (app$1, dependencies) => {
-	app$1.openapi(getResultsRoute, (c) => {
+	const route = createGetResultsRoute(dependencies);
+	app$1.openapi(route, (c) => {
+		const deps = c.var.deps;
 		const { sessionId } = c.req.valid("param");
-		const envelope = dependencies.store.getEnvelope(sessionId);
+		const envelope = deps.store.getEnvelope(sessionId);
 		if (!envelope) return respondNotFound(c, "SESSION_NOT_FOUND", "Session does not exist.");
 		const finalResults = envelope.snapshot.finalResults;
 		if (finalResults === null) return c.json(createErrorResponseBody({
@@ -856,9 +923,14 @@ const registerSessionResultsGetRoute = (app$1, dependencies) => {
 
 //#endregion
 //#region src/routes/sessions/{sessionId}/state.get.ts
-const getSessionStateRoute = createRoute({
+/**
+* 依存注入ミドルウェア付きのルート定義を生成する。
+* @param deps セッションルートに必要な依存オブジェクト。
+*/
+const createGetSessionStateRoute = (deps) => createRoute({
 	method: "get",
 	path: "/sessions/{sessionId}/state",
+	middleware: [createSessionDepsMiddleware(deps)],
 	description: "セッションの最新スナップショットを取得し、ETag でクライアントのキャッシュバージョンと突き合わせます。",
 	request: { params: z.object({ sessionId: z.string().min(1).describe("状態を取得する `session_id`。初期作成レスポンスで受け取った値を指定します。") }) },
 	responses: {
@@ -899,9 +971,11 @@ const isCachedVersionFresh = (ifNoneMatchHeader, version) => {
 * @param dependencies セッションストアなどの依存性。
 */
 const registerSessionStateGetRoute = (app$1, dependencies) => {
-	app$1.openapi(getSessionStateRoute, (c) => {
+	const route = createGetSessionStateRoute(dependencies);
+	app$1.openapi(route, (c) => {
+		const deps = c.var.deps;
 		const { sessionId } = c.req.valid("param");
-		const envelope = dependencies.store.getEnvelope(sessionId);
+		const envelope = deps.store.getEnvelope(sessionId);
 		if (!envelope) return respondNotFound(c, "SESSION_NOT_FOUND", "Session does not exist.");
 		const etag = formatEtag(envelope.version);
 		c.header("ETag", etag);
@@ -913,9 +987,14 @@ const registerSessionStateGetRoute = (app$1, dependencies) => {
 //#endregion
 //#region src/routes/sessions/{sessionId}/stream.get.ts
 const KEEP_ALIVE_INTERVAL_MS = 15e3;
-const sessionStreamRoute = createRoute({
+/**
+* 依存注入ミドルウェア付きのルート定義を生成する。
+* @param deps セッションルートに必要な依存オブジェクト。
+*/
+const createSessionStreamRoute = (deps) => createRoute({
 	method: "get",
 	path: "/sessions/{sessionId}/stream",
+	middleware: [createSessionDepsMiddleware(deps)],
 	description: "指定したセッションの状態更新を SSE (Server-Sent Events) で購読します。`Last-Event-ID` を送ると未取得イベントを再送します。",
 	request: { params: z.object({ sessionId: z.string().min(1).describe("SSE で監視する `session_id`。プレイヤー登録レスポンスで受け取った値を指定します。") }) },
 	responses: {
@@ -937,11 +1016,13 @@ const formatPayload = (event) => ({
 * @param dependencies セッションストアとゲートウェイ。
 */
 const registerSessionStreamGetRoute = (app$1, dependencies) => {
-	app$1.openapi(sessionStreamRoute, (c) => {
+	const route = createSessionStreamRoute(dependencies);
+	app$1.openapi(route, (c) => {
+		const deps = c.var.deps;
 		const { sessionId } = c.req.valid("param");
-		if (!dependencies.store.getEnvelope(sessionId)) return respondNotFound(c, "SESSION_NOT_FOUND", "Session does not exist.");
+		if (!deps.store.getEnvelope(sessionId)) return respondNotFound(c, "SESSION_NOT_FOUND", "Session does not exist.");
 		const lastEventIdHeader = c.req.header("last-event-id");
-		const logReplayAfterId = dependencies.eventLogService.isEventLogId(lastEventIdHeader ?? null) ? lastEventIdHeader ?? void 0 : void 0;
+		const logReplayAfterId = deps.eventLogService.isEventLogId(lastEventIdHeader ?? null) ? lastEventIdHeader ?? void 0 : void 0;
 		let connection = null;
 		let keepAliveHandle = null;
 		const cleanup = () => {
@@ -963,7 +1044,7 @@ const registerSessionStreamGetRoute = (app$1, dependencies) => {
 				send
 			};
 			if (typeof lastEventIdHeader === "string" && lastEventIdHeader.length > 0) connectOptions.lastEventId = lastEventIdHeader;
-			connection = dependencies.sseGateway.connect(connectOptions);
+			connection = deps.sseGateway.connect(connectOptions);
 			keepAliveHandle = setInterval(() => {
 				stream.write(": keep-alive\n\n");
 			}, KEEP_ALIVE_INTERVAL_MS);
@@ -976,7 +1057,7 @@ const registerSessionStreamGetRoute = (app$1, dependencies) => {
 				})
 			};
 			if (logReplayAfterId !== void 0) replayInput.lastEventId = logReplayAfterId;
-			await dependencies.eventLogService.replayEntries(replayInput);
+			await deps.eventLogService.replayEntries(replayInput);
 			await new Promise((resolve) => {
 				stream.onAbort(() => {
 					cleanup();
@@ -1908,6 +1989,7 @@ if (import.meta.main) serve({
 }, (info) => {
 	console.info(`Server is running on http://localhost:${info.port}`);
 });
+hc("http://localhost:3000");
 
 //#endregion
 export { createInMemoryGameStore, createSetupSnapshot };

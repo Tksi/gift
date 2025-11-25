@@ -1,3 +1,4 @@
+import { createMiddleware } from 'hono/factory';
 import type { EventLogService } from 'services/eventLogService.js';
 import type { MonitoringService } from 'services/monitoringService.js';
 import type { RuleHintService } from 'services/ruleHintService.js';
@@ -18,3 +19,23 @@ export type SessionRouteDependencies = {
   ruleHintService: RuleHintService;
   monitoring?: MonitoringService;
 };
+
+/**
+ * 依存を c.var に注入するミドルウェアの環境型。
+ */
+export type SessionEnv = {
+  Variables: {
+    deps: SessionRouteDependencies;
+  };
+};
+
+/**
+ * 依存注入ミドルウェアを生成するファクトリ。
+ * createRoute の middleware プロパティで使用する。
+ * @param deps セッションルートに必要な依存オブジェクト。
+ */
+export const createSessionDepsMiddleware = (deps: SessionRouteDependencies) =>
+  createMiddleware<SessionEnv>(async (c, next) => {
+    c.set('deps', deps);
+    await next();
+  });

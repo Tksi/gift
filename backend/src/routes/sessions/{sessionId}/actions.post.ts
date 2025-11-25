@@ -1,5 +1,9 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import {
+  type SessionRouteDependencies,
+  createSessionDepsMiddleware,
+} from 'routes/sessions/types.js';
+import {
   errorResponseSchema,
   sessionActionBodySchema,
   sessionActionResponseSchema,
@@ -7,73 +11,78 @@ import {
 import { type ServiceError, createErrorResponseBody } from 'services/errors.js';
 import { publishStateEvents } from 'services/ssePublisher.js';
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { SessionRouteDependencies } from 'routes/sessions/types.js';
 import type { GameSnapshot } from 'states/inMemoryGameStore.js';
 
-const postSessionActionRoute = createRoute({
-  method: 'post',
-  path: '/sessions/{sessionId}/actions',
-  description:
-    '手番プレイヤーまたはシステムからのアクションコマンドを TurnDecisionService へ転送し、最新スナップショットと要約情報を返します。',
-  request: {
-    params: z.object({
-      sessionId: z
-        .string()
-        .min(1)
-        .describe('アクションを送信する対象の `session_id`。'),
-    }),
-    body: {
-      required: true,
-      content: {
-        'application/json': {
-          schema: sessionActionBodySchema,
-          example: {
-            command_id: 'cmd-123',
-            state_version: 'etag-hex',
-            player_id: 'alice',
-            action: 'placeChip',
+/**
+ * 依存注入ミドルウェア付きのルート定義を生成する。
+ * @param deps セッションルートに必要な依存オブジェクト。
+ */
+const createPostSessionActionRoute = (deps: SessionRouteDependencies) =>
+  createRoute({
+    method: 'post',
+    path: '/sessions/{sessionId}/actions',
+    middleware: [createSessionDepsMiddleware(deps)] as const,
+    description:
+      '手番プレイヤーまたはシステムからのアクションコマンドを TurnDecisionService へ転送し、最新スナップショットと要約情報を返します。',
+    request: {
+      params: z.object({
+        sessionId: z
+          .string()
+          .min(1)
+          .describe('アクションを送信する対象の `session_id`。'),
+      }),
+      body: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: sessionActionBodySchema,
+            example: {
+              command_id: 'cmd-123',
+              state_version: 'etag-hex',
+              player_id: 'alice',
+              action: 'placeChip',
+            },
           },
         },
       },
     },
-  },
-  responses: {
-    200: {
-      description:
-        'アクションが適用され、新しい状態とターン要約が返却されました。',
-      content: {
-        'application/json': {
-          schema: sessionActionResponseSchema,
+    responses: {
+      200: {
+        description:
+          'アクションが適用され、新しい状態とターン要約が返却されました。',
+        content: {
+          'application/json': {
+            schema: sessionActionResponseSchema,
+          },
+        },
+      },
+      404: {
+        description: 'セッションまたはプレイヤーが存在しません。',
+        content: {
+          'application/json': {
+            schema: errorResponseSchema,
+          },
+        },
+      },
+      409: {
+        description:
+          '`state_version` が最新と一致しない、または完了済みゲームなどのため競合しました。',
+        content: {
+          'application/json': {
+            schema: errorResponseSchema,
+          },
+        },
+      },
+      422: {
+        description: '入力やチップ残量などの検証に失敗しました。',
+        content: {
+          'application/json': {
+            schema: errorResponseSchema,
+          },
         },
       },
     },
-    404: {
-      description: 'セッションまたはプレイヤーが存在しません。',
-      content: {
-        'application/json': {
-          schema: errorResponseSchema,
-        },
-      },
-    },
-    409: {
-      description:
-        '`state_version` が最新と一致しない、または完了済みゲームなどのため競合しました。',
-      content: {
-        'application/json': {
-          schema: errorResponseSchema,
-        },
-      },
-    },
-    422: {
-      description: '入力やチップ残量などの検証に失敗しました。',
-      content: {
-        'application/json': {
-          schema: errorResponseSchema,
-        },
-      },
-    },
-  },
-});
+  });
 
 const createTurnContext = (snapshot: GameSnapshot) => ({
   turn: snapshot.turnState.turn,
@@ -108,12 +117,15 @@ export const registerSessionActionsPostRoute = (
   app: OpenAPIHono,
   dependencies: SessionRouteDependencies,
 ) => {
-  app.openapi(postSessionActionRoute, async (c) => {
+  const route = createPostSessionActionRoute(dependencies);
+
+  app.openapi(route, async (c) => {
+    const deps = c.var.deps;
     const { sessionId } = c.req.valid('param');
     const payload = c.req.valid('json');
 
     try {
-      const result = await dependencies.turnService.applyCommand({
+      const result = await deps.turnService.applyCommand({
         sessionId,
         commandId: payload.command_id,
         expectedVersion: payload.state_version,
@@ -123,8 +135,8 @@ export const registerSessionActionsPostRoute = (
 
       publishStateEvents(
         {
-          sseGateway: dependencies.sseGateway,
-          ruleHints: dependencies.ruleHintService,
+          sseGateway: deps.sseGateway,
+          ruleHints: deps.ruleHintService,
         },
         result.snapshot,
         result.version,
@@ -140,7 +152,7 @@ export const registerSessionActionsPostRoute = (
             message: err.message,
             status,
           });
-          dependencies.sseGateway.publishSystemError(sessionId, body.error);
+          deps.sseGateway.publishSystemError(sessionId, body.error);
 
           return c.json(body, status);
         }
