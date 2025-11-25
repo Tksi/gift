@@ -15,6 +15,10 @@ import {
   createEventLogService,
 } from 'services/eventLogService.js';
 import {
+  type MonitoringService,
+  createMonitoringService,
+} from 'services/monitoringService.js';
+import {
   type RuleHintService,
   createRuleHintService,
 } from 'services/ruleHintService.js';
@@ -41,6 +45,15 @@ export type CreateAppOptions = {
   sseGateway?: SseBroadcastGateway;
   eventLogService?: EventLogService;
   ruleHintService?: RuleHintService;
+  monitoring?: MonitoringService;
+};
+
+/**
+ * console.info で構造化ログを出力するデフォルトロガー。
+ * @param entry ログエントリ。
+ */
+const defaultLogger = (entry: Record<string, unknown>): void => {
+  console.info(JSON.stringify(entry));
 };
 
 const noopTimeoutHandler = (): void => undefined;
@@ -56,7 +69,10 @@ export const createApp = (options: CreateAppOptions = {}) => {
   const now = options.now ?? (() => new Date().toISOString());
   const generateSessionId = options.generateSessionId ?? (() => randomUUID());
   const turnTimeoutMs = options.turnTimeoutMs ?? 45_000;
-  const sseGateway = options.sseGateway ?? createSseBroadcastGateway();
+  const monitoring =
+    options.monitoring ?? createMonitoringService({ log: defaultLogger });
+  const sseGateway =
+    options.sseGateway ?? createSseBroadcastGateway({ monitoring });
   const ruleHintService =
     options.ruleHintService ??
     createRuleHintService({
@@ -78,6 +94,7 @@ export const createApp = (options: CreateAppOptions = {}) => {
       schedule: (handler, delay) => setTimeout(handler, delay),
       cancel: (handle) => clearTimeout(handle),
       onTimeout: (sessionId) => timeoutHandler(sessionId),
+      monitoring,
     });
 
   const sessionsApp = new OpenAPIHono();
@@ -87,6 +104,7 @@ export const createApp = (options: CreateAppOptions = {}) => {
     timerSupervisor,
     turnTimeoutMs,
     eventLogs: eventLogService,
+    monitoring,
   });
 
   if (options.timerSupervisor === undefined) {
@@ -95,6 +113,7 @@ export const createApp = (options: CreateAppOptions = {}) => {
       turnService,
       sseGateway,
       ruleHintService,
+      monitoring,
     });
   }
 
@@ -108,6 +127,7 @@ export const createApp = (options: CreateAppOptions = {}) => {
     sseGateway,
     eventLogService,
     ruleHintService,
+    monitoring,
   };
 
   timerSupervisor.restore();

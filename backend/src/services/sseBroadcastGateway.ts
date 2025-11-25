@@ -1,4 +1,5 @@
 import type { ErrorDetail } from 'services/errors.js';
+import type { MonitoringService } from 'services/monitoringService.js';
 import type { RuleHint } from 'services/ruleHintService.js';
 import type { EventLogEntry, GameSnapshot } from 'states/inMemoryGameStore.js';
 
@@ -107,12 +108,22 @@ const createRuleHintEvent = (
   }),
 });
 
+export type SseBroadcastGatewayDependencies = {
+  monitoring?: MonitoringService;
+};
+
 /**
  * SSE 接続の登録とイベント履歴の管理を行うブロードキャストゲートウェイを構築する。
+ * @param dependencies モニタリングサービスなどのオプション依存性。
  */
-export const createSseBroadcastGateway = (): SseBroadcastGateway => {
+export const createSseBroadcastGateway = (
+  dependencies: SseBroadcastGatewayDependencies = {},
+): SseBroadcastGateway => {
   const connections = new Map<string, Set<SseConnection>>();
   const history = new Map<string, SseEventPayload[]>();
+
+  const getConnectionCount = (sessionId: string): number =>
+    connections.get(sessionId)?.size ?? 0;
 
   const appendHistory = (sessionId: string, event: SseEventPayload) => {
     const events = history.get(sessionId) ?? [];
@@ -197,6 +208,14 @@ export const createSseBroadcastGateway = (): SseBroadcastGateway => {
 
     listeners.add(connection);
     connections.set(options.sessionId, listeners);
+
+    const connectionCount = getConnectionCount(options.sessionId);
+    dependencies.monitoring?.logSseConnectionChange({
+      sessionId: options.sessionId,
+      action: 'connect',
+      connectionCount,
+    });
+
     replayHistory(options.sessionId, options.send, options.lastEventId);
 
     const disconnect = () => {
@@ -211,6 +230,13 @@ export const createSseBroadcastGateway = (): SseBroadcastGateway => {
       if (current.size === 0) {
         connections.delete(options.sessionId);
       }
+
+      const newConnectionCount = getConnectionCount(options.sessionId);
+      dependencies.monitoring?.logSseConnectionChange({
+        sessionId: options.sessionId,
+        action: 'disconnect',
+        connectionCount: newConnectionCount,
+      });
     };
 
     return { disconnect };

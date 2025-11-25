@@ -1,3 +1,4 @@
+import type { MonitoringService } from 'services/monitoringService.js';
 import type { InMemoryGameStore } from 'states/inMemoryGameStore.js';
 
 type TimerHandle = ReturnType<typeof setTimeout>;
@@ -8,6 +9,7 @@ export type TimerSupervisorDependencies = {
   schedule: (handler: () => void, delayMs: number) => TimerHandle;
   cancel: (handle: TimerHandle) => void;
   onTimeout: (sessionId: string) => Promise<void> | void;
+  monitoring?: MonitoringService;
 };
 
 export type TimerSupervisor = {
@@ -60,9 +62,16 @@ export const createTimerSupervisor = (
       return;
     }
 
+    const turn = envelope.snapshot.turnState.turn;
     dependencies.cancel(envelope.deadlineHandle);
     delete envelope.deadlineHandle;
     delete envelope.deadlineAt;
+
+    dependencies.monitoring?.logTimerEvent({
+      sessionId,
+      action: 'clear',
+      turn,
+    });
   };
 
   const register = (
@@ -93,6 +102,7 @@ export const createTimerSupervisor = (
       return;
     }
 
+    const turn = envelope.snapshot.turnState.turn;
     const delay = Math.max(0, dueTime - dependencies.now());
     const handle = dependencies.schedule(() => {
       delete envelope.deadlineHandle;
@@ -102,6 +112,13 @@ export const createTimerSupervisor = (
 
     envelope.deadlineHandle = handle;
     envelope.deadlineAt = dueTime;
+
+    dependencies.monitoring?.logTimerEvent({
+      sessionId,
+      action: 'register',
+      deadline: deadlineIso,
+      turn,
+    });
   };
 
   const restore = (): void => {

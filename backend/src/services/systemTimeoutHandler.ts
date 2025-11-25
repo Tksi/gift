@@ -1,4 +1,5 @@
 import { publishStateEvents } from 'services/ssePublisher.js';
+import type { MonitoringService } from 'services/monitoringService.js';
 import type { RuleHintService } from 'services/ruleHintService.js';
 import type { SseBroadcastGateway } from 'services/sseBroadcastGateway.js';
 import type { TurnDecisionService } from 'services/turnDecision.js';
@@ -13,6 +14,7 @@ export type TimeoutCommandHandlerDependencies = {
   sseGateway?: SseBroadcastGateway;
   ruleHintService?: RuleHintService;
   generateCommandId?: (snapshot: GameSnapshot) => string;
+  monitoring?: MonitoringService;
 };
 
 const defaultGenerateCommandId = (snapshot: GameSnapshot): string =>
@@ -42,6 +44,10 @@ export const createTimeoutCommandHandler = (
       return;
     }
 
+    const turn = turnState.turn;
+    const forcedPlayerId = turnState.currentPlayerId;
+    const cardTaken = turnState.cardInCenter;
+
     try {
       const result = await dependencies.turnService.applyCommand({
         sessionId,
@@ -49,6 +55,13 @@ export const createTimeoutCommandHandler = (
         expectedVersion: envelope.version,
         playerId: 'system',
         action: 'takeCard',
+      });
+
+      dependencies.monitoring?.logSystemTimeout({
+        sessionId,
+        turn,
+        forcedPlayerId,
+        cardTaken,
       });
 
       const eventOptions: Parameters<typeof publishStateEvents>[0] = {};

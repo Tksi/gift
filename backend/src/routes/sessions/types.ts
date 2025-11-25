@@ -1,4 +1,5 @@
 import type { EventLogService } from 'services/eventLogService.js';
+import type { MonitoringService } from 'services/monitoringService.js';
 import type { RuleHintService } from 'services/ruleHintService.js';
 import type { SseBroadcastGateway } from 'services/sseBroadcastGateway.js';
 import type { TimerSupervisor } from 'services/timerSupervisor.js';
@@ -15,4 +16,5 @@ export type SessionRouteDependencies = {
   sseGateway: SseBroadcastGateway;
   eventLogService: EventLogService;
   ruleHintService: RuleHintService;
+  monitoring?: MonitoringService;
 };

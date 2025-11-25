@@ -70,7 +70,15 @@ export const handleLogsCsvExport = (
     return respondMissingSession(c);
   }
 
+  const entryCount = envelope.eventLog.length;
   const csv = createCsvBody(envelope.eventLog);
+
+  dependencies.monitoring?.logExport({
+    sessionId,
+    format: 'csv',
+    entryCount,
+  });
+
   c.header('content-type', 'text/csv; charset=utf-8');
   c.header(
     'content-disposition',
@@ -95,6 +103,13 @@ export const handleLogsJsonExport = (
   if (!envelope) {
     return respondMissingSession(c);
   }
+
+  const entryCount = envelope.eventLog.length;
+  dependencies.monitoring?.logExport({
+    sessionId,
+    format: 'json',
+    entryCount,
+  });
 
   c.header(
     'content-disposition',

@@ -13,6 +13,7 @@ import {
   calculateTurnDeadline,
 } from 'services/timerSupervisor.js';
 import type { EventLogService } from 'services/eventLogService.js';
+import type { MonitoringService } from 'services/monitoringService.js';
 import type {
   GameSnapshot,
   InMemoryGameStore,
@@ -34,6 +35,7 @@ export type TurnDecisionDependencies = {
   timerSupervisor: TimerSupervisor;
   turnTimeoutMs: number;
   eventLogs: EventLogService;
+  monitoring?: MonitoringService;
 };
 
 export type TurnDecisionResult = {
@@ -242,124 +244,175 @@ export const createTurnDecisionService = (
   const applyCommand = async (
     input: TurnCommandInput,
   ): Promise<TurnDecisionResult> => {
+    const startTime = Date.now();
     const envelope = ensureSessionEnvelope(dependencies.store, input.sessionId);
+    const mutexStartTime = Date.now();
 
-    return envelope.mutex.runExclusive(() => {
-      const current = ensureSessionEnvelope(
-        dependencies.store,
-        input.sessionId,
-      );
+    try {
+      const result = await envelope.mutex.runExclusive(() => {
+        const mutexWaitMs = Date.now() - mutexStartTime;
+        dependencies.monitoring?.logMutexWait({
+          sessionId: input.sessionId,
+          waitMs: mutexWaitMs,
+        });
 
-      if (
-        dependencies.store.hasProcessedCommand(input.sessionId, input.commandId)
-      ) {
+        const current = ensureSessionEnvelope(
+          dependencies.store,
+          input.sessionId,
+        );
+
+        if (
+          dependencies.store.hasProcessedCommand(
+            input.sessionId,
+            input.commandId,
+          )
+        ) {
+          return {
+            snapshot: current.snapshot,
+            version: current.version,
+          };
+        }
+
+        if (input.expectedVersion !== current.version) {
+          throw createError(
+            'STATE_VERSION_MISMATCH',
+            409,
+            'State version does not match the latest snapshot.',
+          );
+        }
+
+        const snapshot = cloneSnapshot(current.snapshot);
+        ensureActionAllowed(snapshot, input);
+
+        const actingPlayerId =
+          input.playerId === 'system'
+            ? snapshot.turnState.currentPlayerId
+            : input.playerId;
+        const actionTurn = snapshot.turnState.turn;
+        const cardBeforeAction = snapshot.turnState.cardInCenter;
+        const centralPotBeforeAction = snapshot.centralPot;
+        const chipsBeforeAction =
+          snapshot.chips[actingPlayerId] ?? snapshot.chips[input.playerId] ?? 0;
+
+        applyAction(snapshot, input);
+
+        const chipsAfterAction =
+          snapshot.chips[actingPlayerId] ?? snapshot.chips[input.playerId] ?? 0;
+        const centralPotAfterAction = snapshot.centralPot;
+
+        if (snapshot.phase === 'setup') {
+          snapshot.phase = 'running';
+        }
+
+        const timestamp = dependencies.now();
+        snapshot.updatedAt = timestamp;
+        updateTurnDeadline(snapshot, timestamp, dependencies.turnTimeoutMs);
+
+        if (input.action === 'placeChip' || input.action === 'takeCard') {
+          dependencies.eventLogs.recordAction({
+            sessionId: snapshot.sessionId,
+            turn: actionTurn,
+            actor: input.playerId,
+            targetPlayer: actingPlayerId,
+            action: input.action,
+            card: cardBeforeAction,
+            centralPotBefore: centralPotBeforeAction,
+            centralPotAfter: centralPotAfterAction,
+            chipsBefore: chipsBeforeAction,
+            chipsAfter: chipsAfterAction,
+            timestamp,
+          });
+        }
+
+        let finalSummary: ReturnType<typeof calculateScoreSummary> | null =
+          null;
+
+        if (
+          snapshot.finalResults === null &&
+          snapshot.phase !== 'completed' &&
+          isGameCompleted(snapshot)
+        ) {
+          snapshot.phase = 'completed';
+          finalSummary = calculateScoreSummary(snapshot);
+          snapshot.finalResults = finalSummary;
+          snapshot.turnState.deadline = null;
+        }
+
+        const saved = dependencies.store.saveSnapshot(snapshot);
+        dependencies.store.markCommandProcessed(
+          input.sessionId,
+          input.commandId,
+        );
+
+        const next = saved.snapshot.turnState;
+        const nextDeadline = next.deadline;
+
+        if (
+          next.awaitingAction &&
+          nextDeadline !== null &&
+          nextDeadline !== undefined
+        ) {
+          dependencies.timerSupervisor.register(
+            saved.snapshot.sessionId,
+            nextDeadline,
+          );
+        } else {
+          dependencies.timerSupervisor.clear(saved.snapshot.sessionId);
+        }
+
+        if (finalSummary !== null) {
+          dependencies.eventLogs.recordSystemEvent({
+            sessionId: saved.snapshot.sessionId,
+            turn: saved.snapshot.turnState.turn,
+            actor: 'system',
+            action: 'gameCompleted',
+            timestamp,
+            details: {
+              finalResults: finalSummary,
+            },
+          });
+        }
+
         return {
-          snapshot: current.snapshot,
-          version: current.version,
+          snapshot: saved.snapshot,
+          version: saved.version,
         };
-      }
+      });
 
-      if (input.expectedVersion !== current.version) {
-        throw createError(
-          'STATE_VERSION_MISMATCH',
-          409,
-          'State version does not match the latest snapshot.',
-        );
-      }
+      const durationMs = Date.now() - startTime;
+      dependencies.monitoring?.logActionProcessing({
+        sessionId: input.sessionId,
+        commandId: input.commandId,
+        action: input.action,
+        playerId: input.playerId,
+        durationMs,
+        result: 'success',
+        version: result.version,
+      });
 
-      const snapshot = cloneSnapshot(current.snapshot);
-      ensureActionAllowed(snapshot, input);
+      return result;
+    } catch (err) {
+      const durationMs = Date.now() - startTime;
+      const errorCode =
+        err !== null &&
+        typeof err === 'object' &&
+        'code' in err &&
+        typeof err.code === 'string'
+          ? err.code
+          : 'UNKNOWN_ERROR';
 
-      const actingPlayerId =
-        input.playerId === 'system'
-          ? snapshot.turnState.currentPlayerId
-          : input.playerId;
-      const actionTurn = snapshot.turnState.turn;
-      const cardBeforeAction = snapshot.turnState.cardInCenter;
-      const centralPotBeforeAction = snapshot.centralPot;
-      const chipsBeforeAction =
-        snapshot.chips[actingPlayerId] ?? snapshot.chips[input.playerId] ?? 0;
+      dependencies.monitoring?.logActionProcessing({
+        sessionId: input.sessionId,
+        commandId: input.commandId,
+        action: input.action,
+        playerId: input.playerId,
+        durationMs,
+        result: 'error',
+        errorCode,
+      });
 
-      applyAction(snapshot, input);
-
-      const chipsAfterAction =
-        snapshot.chips[actingPlayerId] ?? snapshot.chips[input.playerId] ?? 0;
-      const centralPotAfterAction = snapshot.centralPot;
-
-      if (snapshot.phase === 'setup') {
-        snapshot.phase = 'running';
-      }
-
-      const timestamp = dependencies.now();
-      snapshot.updatedAt = timestamp;
-      updateTurnDeadline(snapshot, timestamp, dependencies.turnTimeoutMs);
-
-      if (input.action === 'placeChip' || input.action === 'takeCard') {
-        dependencies.eventLogs.recordAction({
-          sessionId: snapshot.sessionId,
-          turn: actionTurn,
-          actor: input.playerId,
-          targetPlayer: actingPlayerId,
-          action: input.action,
-          card: cardBeforeAction,
-          centralPotBefore: centralPotBeforeAction,
-          centralPotAfter: centralPotAfterAction,
-          chipsBefore: chipsBeforeAction,
-          chipsAfter: chipsAfterAction,
-          timestamp,
-        });
-      }
-
-      let finalSummary: ReturnType<typeof calculateScoreSummary> | null = null;
-
-      if (
-        snapshot.finalResults === null &&
-        snapshot.phase !== 'completed' &&
-        isGameCompleted(snapshot)
-      ) {
-        snapshot.phase = 'completed';
-        finalSummary = calculateScoreSummary(snapshot);
-        snapshot.finalResults = finalSummary;
-        snapshot.turnState.deadline = null;
-      }
-
-      const saved = dependencies.store.saveSnapshot(snapshot);
-      dependencies.store.markCommandProcessed(input.sessionId, input.commandId);
-
-      const next = saved.snapshot.turnState;
-      const nextDeadline = next.deadline;
-
-      if (
-        next.awaitingAction &&
-        nextDeadline !== null &&
-        nextDeadline !== undefined
-      ) {
-        dependencies.timerSupervisor.register(
-          saved.snapshot.sessionId,
-          nextDeadline,
-        );
-      } else {
-        dependencies.timerSupervisor.clear(saved.snapshot.sessionId);
-      }
-
-      if (finalSummary !== null) {
-        dependencies.eventLogs.recordSystemEvent({
-          sessionId: saved.snapshot.sessionId,
-          turn: saved.snapshot.turnState.turn,
-          actor: 'system',
-          action: 'gameCompleted',
-          timestamp,
-          details: {
-            finalResults: finalSummary,
-          },
-        });
-      }
-
-      return {
-        snapshot: saved.snapshot,
-        version: saved.version,
-      };
-    });
+      throw err;
+    }
   };
 
   return { applyCommand };
