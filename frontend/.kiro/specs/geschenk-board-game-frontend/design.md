@@ -46,12 +46,8 @@ graph TB
 
         subgraph Composables["Composables Layer"]
             useApi["useApi<br/>Hono RPC クライアント"]
-            useGameStream["useGameStream<br/>SSE 接続管理"]
+            useGameStream["useGameStream<br/>SSE 接続管理 + 状態保持"]
             useGameActions["useGameActions<br/>アクション実行"]
-        end
-
-        subgraph State["Global State (useState)"]
-            GameState["useGameState<br/>ゲーム状態管理"]
         end
     end
 
@@ -62,8 +58,6 @@ graph TB
 
     Pages --> Components
     Components --> Composables
-    Components --> State
-    Composables --> State
     useApi --> HonoAPI
     useGameStream --> SSE
     useGameActions --> useApi
@@ -71,33 +65,33 @@ graph TB
 
 **Architecture Integration**:
 
-- **Selected pattern**: Composables + useState による状態管理。Nuxt 3 のビルトイン機能を活用し、外部依存なしでロジックの再利用性と型安全性を両立
+- **Selected pattern**: Composables による状態管理。useGameStream が SSE から受信したゲーム状態を直接リアクティブに保持し、コンポーネントへ Props 経由で渡す
 - **Domain boundaries**:
-  - Pages: ルーティングとレイアウト
-  - Components: UI 表示ロジック
-  - Composables: API 通信、SSE 管理、ビジネスロジック、グローバル状態管理
+  - Pages: ルーティングとレイアウト、SSE 接続のライフサイクル管理
+  - Components: Props を受け取り UI を表示（状態を持たない）
+  - Composables: API 通信、SSE 管理と状態保持、ビジネスロジック
 - **Existing patterns preserved**: Nuxt 3 の Auto-import、Vue 3 Composition API
 - **Steering compliance**: TypeScript strict mode、ESLint/Prettier による品質維持
 
 ### Technology Stack
 
-| Layer              | Choice / Version           | Role in Feature                       | Notes                      |
-| ------------------ | -------------------------- | ------------------------------------- | -------------------------- |
-| Frontend Framework | Nuxt 3.19+                 | SPA モード、ルーティング、Auto-import | SSR は無効                 |
-| UI Framework       | Vue 3.5+                   | Composition API によるリアクティブ UI | `<script setup>` 記法      |
-| State Management   | useState (Nuxt 3 built-in) | ゲーム状態のグローバル管理            | SSR/CSR 対応、外部依存なし |
-| API Client         | Hono RPC (hono/client)     | 型安全なバックエンド通信              | `hc<AppType>`              |
-| Real-time          | EventSource (native)       | SSE によるリアルタイム更新            | 再接続ロジック自前実装     |
-| Styling            | TailwindCSS                | レスポンシブデザイン                  | インストール済み           |
+| Layer              | Choice / Version       | Role in Feature                        | Notes                    |
+| ------------------ | ---------------------- | -------------------------------------- | ------------------------ |
+| Frontend Framework | Nuxt 3.19+             | SPA モード、ルーティング、Auto-import  | SSR は無効               |
+| UI Framework       | Vue 3.5+               | Composition API によるリアクティブ UI  | `<script setup>` 記法    |
+| State Management   | useGameStream (自前)   | SSE から受信した状態をリアクティブ保持 | Composable 内で Ref 管理 |
+| API Client         | Hono RPC (hono/client) | 型安全なバックエンド通信               | `hc<AppType>`            |
+| Real-time          | EventSource (native)   | SSE によるリアルタイム更新             | 再接続ロジック自前実装   |
+| Styling            | TailwindCSS            | レスポンシブデザイン                   | インストール済み         |
 
 **状態管理の選択理由**:
 
-`research.md` では Pinia を検討したが、以下の理由から useState を採用:
+useGameStream Composable 内で直接状態を保持する方式を採用:
 
-1. **外部依存の削減**: Pinia の追加インストールが不要
-2. **シンプルさ**: ゲーム状態は単一セッションに閉じており、複雑なモジュール分割が不要
-3. **SSR/CSR 互換**: useState は Nuxt のビルトイン機能で SPA モードでも正常動作
-4. **スコープ**: 本機能は「1 ブラウザ = 1 セッション参加」で、グローバル状態の複雑性が限定的
+1. **SSE との密結合**: 状態更新は SSE イベント受信時のみ発生するため、SSE 管理と状態保持を同一 Composable で行うのが自然
+2. **シンプルさ**: グローバル状態管理層を別途設けず、Composable の戻り値として状態を提供
+3. **Props ドリリング**: ページからコンポーネントへ Props で状態を渡すことで、データフローが明確
+4. **スコープ**: 本機能は「1 ブラウザ = 1 セッション参加」で、useGameStream のインスタンスが状態を完全に管理
 
 ---
 
@@ -185,7 +179,7 @@ sequenceDiagram
     participant Actions as useGameActions
     participant API as useApi
     participant Backend as Backend API
-    participant State as useGameState
+    participant Stream as useGameStream
     participant SSE as SSE Stream
 
     User->>Comp: 「チップを置く」または「カードを取る」
@@ -200,13 +194,13 @@ sequenceDiagram
     else 競合 (409)
         Backend-->>API: 409 Conflict
         API-->>Actions: エラー
-        Actions->>State: refetchState()
         Actions-->>Comp: 競合エラー表示
     end
 
     Backend->>SSE: state.delta イベント
-    SSE->>State: 状態更新
-    State-->>Comp: リアクティブ更新
+    SSE->>Stream: イベント受信
+    Stream->>Stream: gameState 更新
+    Stream-->>Comp: リアクティブ更新
 ```
 
 ### SSE 接続・再接続フロー
@@ -233,26 +227,26 @@ stateDiagram-v2
 
 ## Requirements Traceability
 
-| Requirement  | Summary                            | Components             | Interfaces                | Flows                |
-| ------------ | ---------------------------------- | ---------------------- | ------------------------- | -------------------- |
-| 1.1          | プレイヤー情報入力・セッション作成 | SessionForm, index.vue | useApi.createSession      | セッション作成フロー |
-| 1.2          | 作成成功時のゲーム画面遷移         | index.vue              | Nuxt Router               | セッション作成フロー |
-| 1.3, 1.4     | バリデーション（人数、ID重複）     | SessionForm            | validatePlayers           | セッション作成フロー |
-| 1.5          | Hono RPC クライアント使用          | useApi                 | hc<AppType>               | 全 API 通信          |
-| 2.1-2.6      | ゲーム状態表示                     | GameBoard, PlayerPanel | useGameState              | -                    |
-| 2.7          | ターン制限時間表示                 | TurnTimer              | useGameState.deadline     | -                    |
-| 3.1, 3.2     | アクション実行                     | ActionButtons          | useGameActions            | ゲームプレイフロー   |
-| 3.3, 3.6     | ボタン無効化条件                   | ActionButtons          | useGameState              | -                    |
-| 3.4          | 競合エラー処理                     | useGameActions         | handleConflict            | ゲームプレイフロー   |
-| 3.5          | command_id 冪等制御                | useGameActions         | generateCommandId         | ゲームプレイフロー   |
-| 4.1          | SSE 接続確立                       | useGameStream          | EventSource               | SSE 接続フロー       |
-| 4.2-4.4, 4.7 | SSE イベント処理                   | useGameStream          | onStateUpdate, onEventLog | SSE 接続フロー       |
-| 4.5, 4.6     | SSE 再接続                         | useGameStream          | reconnect, lastEventId    | SSE 接続フロー       |
-| 5.1-5.6      | 結果表示                           | ResultScreen           | useGameState.finalResults | -                    |
-| 5.7 (追加)   | ログエクスポート（CSV/JSON）       | ResultScreen           | useApi (logs/export)      | -                    |
-| 6.1-6.4      | ルールヒント表示                   | HintPanel              | useApi.getHint            | -                    |
-| 7.1-7.4      | イベントログ表示                   | EventLog               | useGameState.eventLog     | -                    |
-| 8.1-8.6      | UI/UX 基本要件                     | 全コンポーネント       | -                         | -                    |
+| Requirement  | Summary                            | Components             | Interfaces                 | Flows                |
+| ------------ | ---------------------------------- | ---------------------- | -------------------------- | -------------------- |
+| 1.1          | プレイヤー情報入力・セッション作成 | SessionForm, index.vue | useApi.createSession       | セッション作成フロー |
+| 1.2          | 作成成功時のゲーム画面遷移         | index.vue              | Nuxt Router                | セッション作成フロー |
+| 1.3, 1.4     | バリデーション（人数、ID重複）     | SessionForm            | validatePlayers            | セッション作成フロー |
+| 1.5          | Hono RPC クライアント使用          | useApi                 | hc<AppType>                | 全 API 通信          |
+| 2.1-2.6      | ゲーム状態表示                     | GameBoard, PlayerPanel | useGameStream.gameState    | -                    |
+| 2.7          | ターン制限時間表示                 | TurnTimer              | useGameStream.gameState    | -                    |
+| 3.1, 3.2     | アクション実行                     | ActionButtons          | useGameActions             | ゲームプレイフロー   |
+| 3.3, 3.6     | ボタン無効化条件                   | ActionButtons          | useGameStream.gameState    | -                    |
+| 3.4          | 競合エラー処理                     | useGameActions         | handleConflict             | ゲームプレイフロー   |
+| 3.5          | command_id 冪等制御                | useGameActions         | generateCommandId          | ゲームプレイフロー   |
+| 4.1          | SSE 接続確立                       | useGameStream          | EventSource                | SSE 接続フロー       |
+| 4.2-4.4, 4.7 | SSE イベント処理                   | useGameStream          | onStateUpdate, onEventLog  | SSE 接続フロー       |
+| 4.5, 4.6     | SSE 再接続                         | useGameStream          | reconnect, lastEventId     | SSE 接続フロー       |
+| 5.1-5.6      | 結果表示                           | ResultScreen           | useGameStream.finalResults | -                    |
+| 5.7 (追加)   | ログエクスポート（CSV/JSON）       | ResultScreen           | useApi (logs/export)       | -                    |
+| 6.1-6.4      | ルールヒント表示                   | HintPanel              | useApi.getHint             | -                    |
+| 7.1-7.4      | イベントログ表示                   | EventLog               | useGameStream.eventLog     | -                    |
+| 8.1-8.6      | UI/UX 基本要件                     | 全コンポーネント       | -                          | -                    |
 
 ---
 
@@ -260,20 +254,19 @@ stateDiagram-v2
 
 ### Summary Table
 
-| Component      | Domain/Layer | Intent                    | Req Coverage     | Key Dependencies               | Contracts      |
-| -------------- | ------------ | ------------------------- | ---------------- | ------------------------------ | -------------- |
-| useApi         | Composables  | Hono RPC クライアント提供 | 1.5              | AppType (P0)                   | Service        |
-| useGameStream  | Composables  | SSE 接続管理              | 4.1-4.7          | useGameState (P0)              | Service, Event |
-| useGameActions | Composables  | アクション実行ロジック    | 3.1-3.5          | useApi (P0), useGameState (P0) | Service        |
-| useGameState   | Composables  | ゲーム状態管理            | 2.1-2.7, 7.1-7.4 | -                              | State          |
-| SessionForm    | Components   | セッション作成フォーム    | 1.1, 1.3, 1.4    | useApi (P0)                    | -              |
-| GameBoard      | Components   | ゲーム盤面表示            | 2.1-2.6          | useGameState (P0)              | -              |
-| PlayerPanel    | Components   | プレイヤー情報表示        | 2.3-2.5          | useGameState (P0)              | -              |
-| ActionButtons  | Components   | アクションボタン          | 3.1-3.3, 3.6     | useGameActions (P0)            | -              |
-| TurnTimer      | Components   | ターンタイマー表示        | 2.7              | useGameState (P0)              | -              |
-| EventLog       | Components   | イベントログ表示          | 7.1-7.4          | useGameState (P0)              | -              |
-| ResultScreen   | Components   | 結果表示                  | 5.1-5.6          | useGameState (P0)              | -              |
-| HintPanel      | Components   | ルールヒント表示          | 6.1-6.4          | useApi (P1)                    | -              |
+| Component      | Domain/Layer | Intent                    | Req Coverage              | Key Dependencies                | Contracts      |
+| -------------- | ------------ | ------------------------- | ------------------------- | ------------------------------- | -------------- |
+| useApi         | Composables  | Hono RPC クライアント提供 | 1.5                       | AppType (P0)                    | Service        |
+| useGameStream  | Composables  | SSE 接続管理 + 状態保持   | 2.1-2.7, 4.1-4.7, 7.1-7.4 | -                               | Service, Event |
+| useGameActions | Composables  | アクション実行ロジック    | 3.1-3.5                   | useApi (P0)                     | Service        |
+| SessionForm    | Components   | セッション作成フォーム    | 1.1, 1.3, 1.4             | useApi (P0)                     | -              |
+| GameBoard      | Components   | ゲーム盤面表示            | 2.1-2.6                   | Props (P0)                      | -              |
+| PlayerPanel    | Components   | プレイヤー情報表示        | 2.3-2.5                   | Props (P0)                      | -              |
+| ActionButtons  | Components   | アクションボタン          | 3.1-3.3, 3.6              | useGameActions (P0), Props (P0) | -              |
+| TurnTimer      | Components   | ターンタイマー表示        | 2.7                       | Props (P0)                      | -              |
+| EventLog       | Components   | イベントログ表示          | 7.1-7.4                   | Props (P0)                      | -              |
+| ResultScreen   | Components   | 結果表示                  | 5.1-5.6                   | Props (P0)                      | -              |
+| HintPanel      | Components   | ルールヒント表示          | 6.1-6.4                   | useApi (P1), Props (P0)         | -              |
 
 ---
 
@@ -365,10 +358,10 @@ function useApi(): ApiClient;
 
 #### useGameStream
 
-| Field        | Detail                                           |
-| ------------ | ------------------------------------------------ |
-| Intent       | SSE 接続を管理し、リアルタイムでゲーム状態を更新 |
-| Requirements | 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7                |
+| Field        | Detail                                                     |
+| ------------ | ---------------------------------------------------------- |
+| Intent       | SSE 接続を管理し、リアルタイムでゲーム状態を受信・保持する |
+| Requirements | 2.1-2.7, 4.1-4.7, 5.1-5.6, 7.1-7.4                         |
 
 **Responsibilities & Constraints**
 
@@ -376,11 +369,11 @@ function useApi(): ApiClient;
 - 各イベントタイプのハンドリング
 - 再接続ロジック（exponential backoff）
 - `lastEventId` による欠落イベント回復
+- **ゲーム状態、イベントログ、最終結果、ヒントのリアクティブ保持**
 
 **Dependencies**
 
 - Inbound: GamePage — 接続開始/停止指示 (P0)
-- Outbound: useGameState — 状態更新 (P0)
 - External: EventSource API — SSE 接続 (P0)
 
 **Contracts**: Service [x] / Event [x]
@@ -388,11 +381,28 @@ function useApi(): ApiClient;
 ##### Service Interface
 
 ```typescript
+import type {
+  ScoreSummary,
+  GameSnapshot,
+} from '@backend/states/inMemoryGameStore';
+import type { RuleHint } from '@backend/services/ruleHintService';
+
 interface UseGameStreamOptions {
   sessionId: string;
   onConnect?: () => void;
   onDisconnect?: () => void;
   onError?: (error: Event) => void;
+}
+
+/** SSE イベントログエントリ */
+interface EventLogEntry {
+  id: string;
+  turn: number;
+  actor: string;
+  action: string;
+  timestamp: string;
+  chipsDelta?: number;
+  details?: Record<string, unknown>;
 }
 
 interface UseGameStreamReturn {
@@ -407,6 +417,26 @@ interface UseGameStreamReturn {
 
   /** 最後に受信したイベント ID */
   lastEventId: Ref<string | null>;
+
+  // --- 状態保持 ---
+
+  /** 現在のゲーム状態（リアクティブ） */
+  gameState: Ref<GameSnapshot | null>;
+
+  /** 状態バージョン（楽観的排他制御用） */
+  stateVersion: Ref<string | null>;
+
+  /** イベントログ */
+  eventLog: Ref<EventLogEntry[]>;
+
+  /** 最終結果（ゲーム終了時） */
+  finalResults: Ref<ScoreSummary | null>;
+
+  /** 現在のヒント */
+  currentHint: Ref<RuleHint | null>;
+
+  /** 最新のシステムエラー */
+  lastSystemError: Ref<{ code: string; message: string } | null>;
 }
 
 function useGameStream(options: UseGameStreamOptions): UseGameStreamReturn;
@@ -415,11 +445,11 @@ function useGameStream(options: UseGameStreamOptions): UseGameStreamReturn;
 ##### Event Contract
 
 - **Subscribed events**:
-  - `state.delta`: ゲーム状態更新 → `useGameState().updateState()`
-  - `state.final`: ゲーム終了 → `useGameState().setFinalResults()`
-  - `event.log`: イベントログ追加 → `useGameState().appendEventLog()`
-  - `rule.hint`: ヒント更新 → `useGameState().updateHint()`
-  - `system.error`: エラー通知 → エラートースト表示
+  - `state.delta`: ゲーム状態更新 → `gameState` と `stateVersion` を更新
+  - `state.final`: ゲーム終了 → `finalResults` を設定
+  - `event.log`: イベントログ追加 → `eventLog` に追加
+  - `rule.hint`: ヒント更新 → `currentHint` を更新
+  - `system.error`: エラー通知 → `lastSystemError` を設定
 - **Ordering / delivery guarantees**: `Last-Event-ID` による順序保証
 
 **Implementation Notes**
@@ -440,13 +470,12 @@ function useGameStream(options: UseGameStreamOptions): UseGameStreamReturn;
 
 - アクション実行前のバリデーション
 - `command_id` の生成と管理
-- 競合エラー時の状態再取得
+- 競合エラー時のエラーハンドリング
 
 **Dependencies**
 
 - Inbound: ActionButtons — アクション実行要求 (P0)
 - Outbound: useApi — API 呼び出し (P0)
-- Outbound: useGameState — 状態参照・更新 (P0)
 
 **Contracts**: Service [x]
 
@@ -497,140 +526,8 @@ function useGameActions(sessionId: string): UseGameActionsReturn;
 **Implementation Notes**
 
 - `command_id` は `crypto.randomUUID()` で生成
-- 競合（409）時は自動で最新状態を取得し再試行を促す
-- アクション成功時、レスポンスの `turn_context` を使って SSE 到達前に即時 UI 更新（レスポンシブな UX）
-
----
-
-#### useGameState
-
-| Field        | Detail                                                                         |
-| ------------ | ------------------------------------------------------------------------------ |
-| Intent       | Nuxt useState を使用してゲーム状態をグローバルに管理し、コンポーネント間で共有 |
-| Requirements | 2.1-2.7, 5.1-5.6, 7.1-7.4                                                      |
-
-**Responsibilities & Constraints**
-
-- ゲームスナップショットの保持
-- 派生状態（現在プレイヤー、アクション可否など）の算出
-- イベントログの管理
-- Nuxt の useState を使用した SSR/CSR 対応のグローバル状態管理
-
-**Dependencies**
-
-- Inbound: useGameStream — 状態更新 (P0)
-- Inbound: Components — 状態参照 (P0)
-- External: `useState` (Nuxt 3 built-in) — グローバル状態管理 (P0)
-
-**Contracts**: State [x]
-
-##### Service Interface
-
-```typescript
-interface GameState {
-  /** セッション ID */
-  sessionId: string | null;
-
-  /** 自分のプレイヤー ID（観戦モードの場合は null） */
-  myPlayerId: string | null;
-
-  /** 状態バージョン（楽観的排他制御用） */
-  stateVersion: string | null;
-
-  /** ゲームフェーズ */
-  phase: 'setup' | 'running' | 'completed' | null;
-
-  /** 中央カード */
-  cardInCenter: number | null;
-
-  /** 中央ポットのチップ数 */
-  centralPot: number;
-
-  /** 山札の残り枚数 */
-  deckCount: number;
-
-  /** 現在の手番プレイヤー ID */
-  currentPlayerId: string | null;
-
-  /** ターン制限時刻 */
-  deadline: string | null;
-
-  /** プレイヤー一覧 */
-  players: Array<{
-    id: string;
-    displayName: string;
-    chips: number;
-    cards: number[];
-  }>;
-
-  /** イベントログ */
-  eventLog: EventLogEntry[];
-
-  /** 最終結果 */
-  finalResults: ScoreSummary | null;
-
-  /** 現在のヒント */
-  currentHint: RuleHint | null;
-}
-
-interface UseGameStateReturn {
-  /** ゲーム状態（リアクティブ） */
-  state: Ref<GameState>;
-
-  /** 自分のプレイヤー ID を設定 */
-  setMyPlayerId: (playerId: string | null) => void;
-
-  /** 状態を初期化 */
-  initSession: (
-    sessionId: string,
-    snapshot: GameSnapshot,
-    version: string,
-  ) => void;
-
-  /** 状態を更新 */
-  updateState: (snapshot: GameSnapshot, version: string) => void;
-
-  /** 自分が手番プレイヤーか（computed） */
-  isMyTurn: ComputedRef<boolean>;
-
-  /** 自分のチップ数（computed） */
-  myChips: ComputedRef<number>;
-
-  /** 最終結果を設定 */
-  setFinalResults: (results: ScoreSummary) => void;
-
-  /** イベントログを追加 */
-  appendEventLog: (entry: EventLogEntry) => void;
-
-  /** ヒントを更新 */
-  updateHint: (hint: RuleHint) => void;
-
-  /** 状態をクリア */
-  reset: () => void;
-
-  /** 手番プレイヤーか判定 */
-  isCurrentPlayer: (playerId: string) => boolean;
-
-  /** チップを置けるか判定 */
-  canPlaceChip: (playerId: string) => boolean;
-
-  /** ゲーム終了済みか（computed） */
-  isGameOver: ComputedRef<boolean>;
-}
-
-function useGameState(): UseGameStateReturn;
-```
-
-**Implementation Notes**
-
-- `useState<GameState>('game-state', () => initialState)` でグローバル状態を定義
-- 初期状態は composable 内で定義し、SSR/CSR で一貫した動作を保証
-- computed プロパティは `useGameState()` 呼び出し時に算出
-
-**Persistence & Consistency**:
-
-- メモリ内のみ（セッション終了で破棄）
-- SSE イベントによる単方向更新（サーバーが正）
+- 競合（409）時はエラーを返し、SSE による最新状態到達を待つ
+- `stateVersion` は呼び出し側（ページ）から渡される
 
 ---
 
@@ -893,12 +790,12 @@ erDiagram
 ### Unit Tests
 
 - `useApi`: 各 API メソッドのリクエスト/レスポンス型検証
-- `useGameState`: 状態更新ロジック、computed プロパティの算出
+- `useGameStream`: SSE イベント受信時の状態更新ロジック
 - `useGameActions`: アクション実行可否判定、command_id 生成
 
 ### Integration Tests
 
-- `useGameStream`: SSE イベント受信と Store 更新の連携
+- `useGameStream`: SSE イベント受信と状態更新の連携
 - SessionForm → useApi → Router の遷移フロー
 
 ### E2E Tests
@@ -921,4 +818,4 @@ erDiagram
 
 - **SSE 接続数**: ブラウザごとに1接続、セッションごとに最大7接続想定
 - **状態サイズ**: GameSnapshot は数KB、パフォーマンス影響なし
-- **再レンダリング**: Vue の computed による最適化、useState のリアクティビティを活用
+- **再レンダリング**: Vue の computed による最適化、useGameStream の Ref によるリアクティビティを活用

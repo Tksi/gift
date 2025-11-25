@@ -12,7 +12,9 @@
     "lint:check": "eslint **/*.{js,ts,vue} --concurrency auto --cache --cache-location node_modules/.cache/.eslintcache",
     "type:check": "nuxi typecheck",
     "checkall": "npm run format:check && npm run lint:check && npm run type:check",
-    "fix": "prettier . --cache --write --log-level warn --ignore-path .gitignore; npm run lint:check -- --fix; npm run type:check"
+    "fix": "prettier . --cache --write --log-level warn --ignore-path .gitignore; npm run lint:check -- --fix; npm run type:check",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@nuxt/eslint": "^1.9.0",
@@ -21,10 +23,14 @@
     "vue": "latest"
   },
   "devDependencies": {
+    "@nuxt/test-utils": "^3.20.1",
+    "@vue/test-utils": "^2.4.6",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-jsdoc": "^61.1.4",
+    "happy-dom": "^20.0.10",
     "hono": "^4.10.4",
     "prettier": "^3.6.2",
+    "vitest": "^3.2.4",
     "vue-tsc": "^3.1.1"
   }
 }

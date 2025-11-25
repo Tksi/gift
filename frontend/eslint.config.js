@@ -8,6 +8,9 @@ import withNuxt from './.nuxt/eslint.config.mjs';
 
 export default withNuxt(
   {
+    ignores: ['**/*.test.ts', '**/*.spec.ts'],
+  },
+  {
     rules: {
       'vue/no-multiple-template-root': 'off',
       'vue/require-default-prop': 'off',

@@ -17,7 +17,7 @@
 
 ## Task 2: リアルタイム通信の実装
 
-- [ ] 2.1 SSE接続管理Composableの実装
+- [x] 2.1 SSE接続管理Composableの実装
   - EventSourceを使用したSSE接続の確立・切断
   - 接続状態（disconnected/connecting/connected/reconnecting）の管理
   - exponential backoff による自動再接続ロジック
@@ -25,7 +25,7 @@
   - SSEから受信したゲーム状態をリアクティブに保持
   - _Requirements: 4.1, 4.5, 4.6, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7_
 
-- [ ] 2.2 SSEイベントハンドラの実装
+- [x] 2.2 SSEイベントハンドラの実装
   - `state.delta` イベント受信時のゲーム状態更新
   - `state.final` イベント受信時のゲーム終了処理
   - `event.log` イベント受信時のログ追記
