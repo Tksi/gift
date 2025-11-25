@@ -141,4 +141,28 @@ describe('POST /sessions', () => {
       'Review the request payload and try again.',
     );
   });
+
+  it('プレイヤー数が8名以上の場合も 422 と理由コードを返す', async () => {
+    const { app } = createTestApp();
+
+    const eightPlayers = Array.from({ length: 8 }, (_, i) => ({
+      id: `p${i + 1}`,
+      display_name: `Player ${i + 1}`,
+    }));
+
+    const response = await app.request('/sessions', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        players: eightPlayers,
+      }),
+    });
+
+    expect(response.status).toBe(422);
+    const payload = (await response.json()) as ErrorResponse;
+    expect(payload.error.code).toBe('PLAYER_COUNT_INVALID');
+    expect(payload.error.reason_code).toBe('REQUEST_INVALID');
+  });
 });

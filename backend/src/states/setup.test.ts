@@ -48,4 +48,36 @@ describe('createSetupSnapshot の挙動', () => {
     expect(first.deck).not.toEqual(second.deck);
     expect(first.playerOrder).not.toEqual(second.playerOrder);
   });
+
+  it('プレイヤー数が1名の場合はエラーを投げる', () => {
+    expect(() => createSetupSnapshot(['solo'])).toThrowError(
+      'Players must contain between 2 and 7 entries to satisfy setup rules.',
+    );
+  });
+
+  it('プレイヤー数が8名以上の場合はエラーを投げる', () => {
+    const eightPlayers = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8'];
+
+    expect(() => createSetupSnapshot(eightPlayers)).toThrowError(
+      'Players must contain between 2 and 7 entries to satisfy setup rules.',
+    );
+  });
+
+  it('プレイヤー数が2名のときはセットアップが成功する', () => {
+    const twoPlayers = ['alice', 'bob'];
+    const snapshot = createSetupSnapshot(twoPlayers);
+
+    expect(snapshot.playerOrder).toHaveLength(2);
+    expect(snapshot.deck).toHaveLength(24);
+    expect(snapshot.discardHidden).toHaveLength(9);
+  });
+
+  it('プレイヤー数が7名のときはセットアップが成功する', () => {
+    const sevenPlayers = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7'];
+    const snapshot = createSetupSnapshot(sevenPlayers);
+
+    expect(snapshot.playerOrder).toHaveLength(7);
+    expect(snapshot.deck).toHaveLength(24);
+    expect(snapshot.discardHidden).toHaveLength(9);
+  });
 });

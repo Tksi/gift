@@ -99,4 +99,29 @@ describe('ChipLedger の挙動', () => {
     expect(notification).toBeNull();
     expect(snapshot.chips.alice).toBe(11);
   });
+
+  it('未登録のプレイヤーがアクションを試みると PLAYER_NOT_FOUND エラーを投げる', () => {
+    const snapshot = createSnapshot();
+
+    expect(() =>
+      ensureChipActionAllowed(snapshot, 'unknown', 'placeChip'),
+    ).toThrowError('Player unknown is not registered.');
+
+    try {
+      ensureChipActionAllowed(snapshot, 'unknown', 'placeChip');
+    } catch (err) {
+      expect(err).toMatchObject({
+        code: 'PLAYER_NOT_FOUND',
+        status: 404,
+      });
+    }
+  });
+
+  it('未登録のプレイヤーが placeChipIntoCenter を試みると PLAYER_NOT_FOUND エラーを投げる', () => {
+    const snapshot = createSnapshot();
+
+    expect(() => placeChipIntoCenter(snapshot, 'unknown')).toThrowError(
+      'Player unknown is not registered.',
+    );
+  });
 });

@@ -133,4 +133,97 @@ describe('calculateScoreSummary', () => {
       winner: 'bob',
     });
   });
+
+  it('複数の連番グループを正しく判定する', () => {
+    const snapshot = createSnapshot({
+      hands: {
+        alice: [3, 4, 5, 10, 11, 20],
+        bob: [6],
+        carl: [],
+      },
+      chips: {
+        alice: 2,
+        bob: 3,
+        carl: 10,
+      },
+    });
+
+    const summary = calculateScoreSummary(snapshot);
+    const alicePlacement = summary.placements.find(
+      (placement) => placement.playerId === 'alice',
+    );
+
+    expect(alicePlacement?.cardSets).toEqual([[3, 4, 5], [10, 11], [20]]);
+    expect(alicePlacement?.score).toBe(3 + 10 + 20 - 2);
+  });
+
+  it('同点かつチップ数も同じ場合は winner が null になる', () => {
+    const snapshot = createSnapshot({
+      hands: {
+        alice: [10],
+        bob: [7, 8, 9],
+        carl: [],
+      },
+      chips: {
+        alice: 0,
+        bob: 0,
+        carl: 0,
+      },
+    });
+
+    const summary = calculateScoreSummary(snapshot);
+    const scores = summary.placements.map((item) => ({
+      id: item.playerId,
+      score: item.score,
+    }));
+
+    expect(scores).toEqual([
+      { id: 'carl', score: 0 },
+      { id: 'bob', score: 7 },
+      { id: 'alice', score: 10 },
+    ]);
+    expect(summary.tieBreak).toBeNull();
+  });
+
+  it('3人以上が同点でチップも同数の場合は winner が null になる', () => {
+    const snapshot = createSnapshot({
+      hands: {
+        alice: [10],
+        bob: [10],
+        carl: [10],
+      },
+      chips: {
+        alice: 5,
+        bob: 5,
+        carl: 5,
+      },
+    });
+
+    const summary = calculateScoreSummary(snapshot);
+
+    expect(summary.placements.map((item) => item.score)).toEqual([5, 5, 5]);
+    expect(summary.tieBreak?.tiedScore).toBe(5);
+    expect(summary.tieBreak?.contenders).toEqual(['alice', 'bob', 'carl']);
+    expect(summary.tieBreak?.winner).toBeNull();
+  });
+
+  it('全員異なるスコアの場合は tieBreak が null になる', () => {
+    const snapshot = createSnapshot({
+      hands: {
+        alice: [5],
+        bob: [10],
+        carl: [20],
+      },
+      chips: {
+        alice: 0,
+        bob: 0,
+        carl: 0,
+      },
+    });
+
+    const summary = calculateScoreSummary(snapshot);
+
+    expect(summary.placements.map((item) => item.score)).toEqual([5, 10, 20]);
+    expect(summary.tieBreak).toBeNull();
+  });
 });
