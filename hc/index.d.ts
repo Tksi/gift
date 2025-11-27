@@ -3421,6 +3421,12 @@ type InMemoryGameStore = {
   hasProcessedCommand: (sessionId: string, commandId: string) => boolean;
   markCommandProcessed: (sessionId: string, commandId: string) => void;
   listSessions: () => SessionSummary[];
+  /**
+   * 指定した日時より前に更新されたセッションを削除する。
+   * @param olderThan この日時より前のセッションを削除。
+   * @returns 削除されたセッションIDのリスト。
+   */
+  pruneSessionsOlderThan: (olderThan: Date) => string[];
 };
 //#endregion
 //#region src/services/ruleHintService.d.ts
