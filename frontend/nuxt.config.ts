@@ -5,7 +5,7 @@ export default defineNuxtConfig({
   devtools: { enabled: false },
   ssr: false,
   alias: {
-    '@hc': '../hc',
+    '@hc': '../hc/index',
   },
   runtimeConfig: {
     public: {
