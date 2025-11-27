@@ -17,14 +17,14 @@
 
 ## Task 2: SSE 接続管理 Composable の実装
 
-- [ ] 2.1 EventSource を使った SSE 接続の確立と切断機能を実装する
+- [x] 2.1 EventSource を使った SSE 接続の確立と切断機能を実装する
   - セッション ID を受け取り SSE エンドポイントへ接続
   - イベント受信時にコールバックを呼び出す
   - 接続状態 (disconnected, connecting, connected, reconnecting) を ref で公開
   - コンポーネントアンマウント時に自動切断
   - _Requirements: 3.1, 3.2, 3.3_
 
-- [ ] 2.2 自動再接続ロジックを実装する
+- [x] 2.2 自動再接続ロジックを実装する
   - 接続切断時に exponential backoff で再接続を試行
   - Last-Event-ID を送信して未取得イベントを再取得
   - 最大リトライ回数を設定し、超過時はエラーコールバックを呼び出す
