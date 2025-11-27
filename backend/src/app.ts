@@ -6,9 +6,11 @@ import { createSessionDepsMiddleware } from 'routes/sessions/types.js';
 import { sessionActionsPostApp } from 'routes/sessions/{sessionId}/actions.post.js';
 import { sessionHintGetApp } from 'routes/sessions/{sessionId}/hint.get.js';
 import { sessionGetApp } from 'routes/sessions/{sessionId}/index.get.js';
+import { sessionJoinPostApp } from 'routes/sessions/{sessionId}/join.post.js';
 import { logsExportCsvGetApp } from 'routes/sessions/{sessionId}/logs/export.csv.get.js';
 import { logsExportJsonGetApp } from 'routes/sessions/{sessionId}/logs/export.json.get.js';
 import { sessionResultsGetApp } from 'routes/sessions/{sessionId}/results.get.js';
+import { sessionStartPostApp } from 'routes/sessions/{sessionId}/start.post.js';
 import { sessionStateGetApp } from 'routes/sessions/{sessionId}/state.get.js';
 import { sessionStreamGetApp } from 'routes/sessions/{sessionId}/stream.get.js';
 import {
@@ -147,6 +149,8 @@ export const createApp = (options: CreateAppOptions = {}) => {
     .route('/', sessionStreamGetApp)
     .route('/', sessionActionsPostApp)
     .route('/', sessionResultsGetApp)
+    .route('/', sessionJoinPostApp)
+    .route('/', sessionStartPostApp)
     .route('/', logsExportCsvGetApp)
     .route('/', logsExportJsonGetApp)
     .doc('/doc', {

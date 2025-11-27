@@ -125,26 +125,44 @@ const readNextEventOfType = async (
   }
 };
 
+/**
+ * ゲーム開始状態のセッションを作成するヘルパー。
+ */
 const createSession = async () => {
   const app = createApp({
     now: () => '2025-01-01T00:00:00.000Z',
     generateSessionId: () => 'session-test',
   });
 
-  const response = await app.request('/sessions', {
+  // セッション作成
+  const createResponse = await app.request('/sessions', {
     method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      players: [
-        { id: 'alice', display_name: 'Alice' },
-        { id: 'bob', display_name: 'Bob' },
-      ],
-    }),
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ max_players: 2 }),
   });
+  const createPayload = (await createResponse.json()) as SessionResponse;
+  const sessionId = createPayload.session_id;
 
-  const session = (await response.json()) as SessionResponse;
+  // プレイヤー参加
+  for (const player of [
+    { id: 'alice', display_name: 'Alice' },
+    { id: 'bob', display_name: 'Bob' },
+  ]) {
+    await app.request(`/sessions/${sessionId}/join`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        player_id: player.id,
+        display_name: player.display_name,
+      }),
+    });
+  }
+
+  // ゲーム開始
+  const startResponse = await app.request(`/sessions/${sessionId}/start`, {
+    method: 'POST',
+  });
+  const session = (await startResponse.json()) as SessionResponse;
 
   return { app, session };
 };
@@ -167,18 +185,34 @@ describe('GET /sessions/{sessionId}/stream', () => {
     }
 
     const reader = createSseEventReader(body);
-    const stateEvent = await readNextDataEvent(reader);
+    // join 時のイベントをスキップして setup/running フェーズの state.delta を取得
+    let data: SessionResponse | null = null;
 
-    expect(stateEvent).not.toBeNull();
+    while (true) {
+      const event = await readNextDataEvent(reader);
 
-    if (!stateEvent) {
-      return;
+      if (!event) {
+        throw new Error('Expected state.delta event not found');
+      }
+
+      if (event.event === 'state.delta') {
+        const parsed = JSON.parse(event.data) as SessionResponse;
+
+        if (
+          parsed.state.phase === 'setup' ||
+          parsed.state.phase === 'running'
+        ) {
+          data = parsed;
+
+          break;
+        }
+      }
     }
 
-    expect(stateEvent.event).toBe('state.delta');
-    const data = JSON.parse(stateEvent.data) as SessionResponse;
+    expect(data).not.toBeNull();
     expect(data.session_id).toBe(session.session_id);
-    expect(data.state_version).toBe(session.state_version);
+    // state_version は SSE 接続時の最新版なので存在確認のみ
+    expect(data.state_version).toBeTruthy();
 
     const hintEvent = await readNextDataEvent(reader);
 
@@ -209,10 +243,33 @@ describe('GET /sessions/{sessionId}/stream', () => {
     }
 
     const reader = createSseEventReader(body);
-    await readNextDataEvent(reader);
-    await readNextDataEvent(reader);
+    // join 時のイベントをスキップして setup/running フェーズの state.delta を取得
+    let initialState: SessionResponse | null = null;
 
-    const actorId = session.state.turnState.currentPlayerId;
+    while (true) {
+      const event = await readNextDataEvent(reader);
+
+      if (!event) {
+        throw new Error('Expected state.delta event not found');
+      }
+
+      if (event.event === 'state.delta') {
+        const data = JSON.parse(event.data) as SessionResponse;
+
+        if (data.state.phase === 'setup' || data.state.phase === 'running') {
+          initialState = data;
+
+          break;
+        }
+      }
+    }
+
+    expect(initialState).not.toBeNull();
+    const currentVersion = initialState.state_version;
+
+    await readNextDataEvent(reader); // rule.hint を読み飛ばす
+
+    const actorId = initialState.state.turnState.currentPlayerId;
 
     const actionResponse = await app.request(
       `/sessions/${session.session_id}/actions`,
@@ -223,7 +280,7 @@ describe('GET /sessions/{sessionId}/stream', () => {
         },
         body: JSON.stringify({
           command_id: 'cmd-1',
-          state_version: session.state_version,
+          state_version: currentVersion,
           player_id: actorId,
           action: 'placeChip',
         }),

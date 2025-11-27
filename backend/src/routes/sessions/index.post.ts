@@ -1,23 +1,15 @@
 import { OpenAPIHono, createRoute } from '@hono/zod-openapi';
-import {
-  respondValidationError,
-  toSessionResponse,
-} from 'routes/sessions/shared.js';
+import { respondValidationError } from 'routes/sessions/shared.js';
 import {
   createSessionBodySchema,
   errorResponseSchema,
   sessionResponseSchema,
 } from 'schema/sessions.js';
-import { publishStateEvents } from 'services/ssePublisher.js';
-import { calculateTurnDeadline } from 'services/timerSupervisor.js';
-import { createSetupSnapshot } from 'states/setup.js';
 import type { SessionEnv } from 'routes/sessions/types.js';
-import type { PlayerRegistration } from 'schema/players.js';
-import type { GameSnapshot, PlayerSummary } from 'states/inMemoryGameStore.js';
+import type { GameSnapshot } from 'states/inMemoryGameStore.js';
 
 const MIN_PLAYERS = 2;
 const MAX_PLAYERS = 7;
-const INITIAL_PLAYER_CHIPS = 11;
 
 /**
  * セッション作成 POST ルートの静的定義。
@@ -26,7 +18,7 @@ export const sessionPostRoute = createRoute({
   method: 'post',
   path: '/sessions',
   description:
-    '指定されたプレイヤー情報と任意のシード値を用いてゲームのセットアップを実行し、初期スナップショットと状態バージョンを返します。',
+    '指定されたプレイヤー人数でロビー状態のセッションを作成します。プレイヤーは /sessions/{id}/join で参加します。',
   request: {
     body: {
       required: true,
@@ -34,21 +26,18 @@ export const sessionPostRoute = createRoute({
         'application/json': {
           schema: createSessionBodySchema,
           example: {
+            max_players: 3,
             seed: 'optional-seed-string',
-            players: [
-              { id: 'alice', display_name: 'Alice' },
-              { id: 'bob', display_name: 'Bob' },
-            ],
           },
         },
       },
-      description:
-        'プレイヤー ID と表示名、そして任意の乱数シード。ID は 2〜7 名、英数 + `_`/`-` のみ許可されます。',
+      description: '参加可能なプレイヤー人数（2〜7人）と任意の乱数シード。',
     },
   },
   responses: {
     201: {
-      description: '新しいセッションが作成され、初期状態が返却されました。',
+      description:
+        '新しいセッション（ロビー状態）が作成され、初期状態が返却されました。',
       content: {
         'application/json': {
           schema: sessionResponseSchema,
@@ -57,7 +46,7 @@ export const sessionPostRoute = createRoute({
     },
     422: {
       description:
-        '入力検証に失敗しました。プレイヤー人数や ID の重複などを `error.code` で示します。',
+        '入力検証に失敗しました。プレイヤー人数などを `error.code` で示します。',
       content: {
         'application/json': {
           schema: errorResponseSchema,
@@ -67,117 +56,42 @@ export const sessionPostRoute = createRoute({
   },
 });
 
-type NormalizedPlayer = PlayerSummary;
-
-type PlayerConstraintFailure = {
-  ok: false;
-  code: string;
-  message: string;
-};
-
-type PlayerConstraintSuccess = {
-  ok: true;
-  players: NormalizedPlayer[];
-};
-
-const ensurePlayerConstraints = (
-  players: readonly PlayerRegistration[],
-): PlayerConstraintFailure | PlayerConstraintSuccess => {
-  if (players.length < MIN_PLAYERS || players.length > MAX_PLAYERS) {
-    return {
-      ok: false,
-      code: 'PLAYER_COUNT_INVALID',
-      message: `Players must contain between ${MIN_PLAYERS} and ${MAX_PLAYERS} entries.`,
-    };
-  }
-
-  const normalized: NormalizedPlayer[] = [];
-  const existing = new Set<string>();
-
-  for (const player of players) {
-    const id = player.id.trim();
-    const displayName = player.display_name.trim();
-
-    if (id.length === 0) {
-      return {
-        ok: false,
-        code: 'PLAYER_ID_INVALID',
-        message: 'Player id cannot be empty.',
-      };
-    }
-
-    if (displayName.length === 0) {
-      return {
-        ok: false,
-        code: 'PLAYER_NAME_INVALID',
-        message: `Player ${player.id} display name cannot be empty.`,
-      };
-    }
-
-    if (existing.has(id)) {
-      return {
-        ok: false,
-        code: 'PLAYER_ID_NOT_UNIQUE',
-        message: `Player id ${id} is duplicated.`,
-      };
-    }
-
-    existing.add(id);
-    normalized.push({ id, displayName });
-  }
-
-  return { ok: true, players: normalized };
-};
-
-const createInitialSnapshot = (
+/**
+ * ロビー状態の初期スナップショットを作成する。
+ * @param sessionId セッションID。
+ * @param maxPlayers 最大プレイヤー人数。
+ * @param timestamp 作成日時。
+ * @param seed 乱数シード（オプション）。
+ */
+const createWaitingSnapshot = (
   sessionId: string,
-  players: readonly NormalizedPlayer[],
+  maxPlayers: number,
   timestamp: string,
   seed?: string,
-): GameSnapshot => {
-  const setupOptions = seed === undefined ? undefined : { seed };
-  const setup = createSetupSnapshot(
-    players.map((player) => player.id),
-    setupOptions,
-  );
-
-  const chips: Record<string, number> = {};
-  const hands: Record<string, number[]> = {};
-
-  for (const player of players) {
-    chips[player.id] = INITIAL_PLAYER_CHIPS;
-    hands[player.id] = [];
-  }
-
-  const [activeCard, ...remainingDeck] = setup.deck;
-  const firstPlayerIndex = 0;
-  const firstPlayerId =
-    setup.playerOrder[firstPlayerIndex] ?? players[0]?.id ?? '';
-  const awaitingAction = activeCard !== undefined;
-
-  return {
-    sessionId,
-    phase: 'setup',
-    deck: remainingDeck,
-    discardHidden: setup.discardHidden,
-    playerOrder: setup.playerOrder,
-    rngSeed: setup.rngSeed,
-    players: [...players],
-    chips,
-    hands,
-    centralPot: 0,
-    turnState: {
-      turn: awaitingAction ? 1 : 0,
-      currentPlayerId: firstPlayerId,
-      currentPlayerIndex: firstPlayerIndex,
-      cardInCenter: activeCard ?? null,
-      awaitingAction,
-    },
-    createdAt: timestamp,
-    updatedAt: timestamp,
-    finalResults: null,
-  };
-};
+): GameSnapshot => ({
+  sessionId,
+  phase: 'waiting',
+  deck: [],
+  discardHidden: [],
+  playerOrder: [],
+  rngSeed: seed ?? '',
+  players: [],
+  chips: {},
+  hands: {},
+  centralPot: 0,
+  turnState: {
+    turn: 0,
+    currentPlayerId: '',
+    currentPlayerIndex: 0,
+    cardInCenter: null,
+    awaitingAction: false,
+    deadline: null,
+  },
+  createdAt: timestamp,
+  updatedAt: timestamp,
+  finalResults: null,
+  maxPlayers,
+});
 
 /**
  * セッション作成 POST ルートを持つ Hono アプリケーション。
@@ -187,52 +101,35 @@ export const sessionPostApp = new OpenAPIHono<SessionEnv>().openapi(
   (c) => {
     const deps = c.var.deps;
     const payload = c.req.valid('json');
-    const check = ensurePlayerConstraints(payload.players);
+    const maxPlayers = payload.max_players;
 
-    if (check.ok) {
-      const sessionId = deps.generateSessionId();
-      const snapshot = createInitialSnapshot(
-        sessionId,
-        check.players,
-        deps.now(),
-        payload.seed,
+    // プレイヤー人数のバリデーション
+    if (maxPlayers < MIN_PLAYERS || maxPlayers > MAX_PLAYERS) {
+      return respondValidationError(
+        c,
+        'PLAYER_COUNT_INVALID',
+        `Player count must be between ${MIN_PLAYERS} and ${MAX_PLAYERS}.`,
       );
-
-      if (snapshot.turnState.awaitingAction) {
-        snapshot.turnState.deadline = calculateTurnDeadline(
-          snapshot.updatedAt,
-          deps.turnTimeoutMs,
-        );
-      } else {
-        snapshot.turnState.deadline = null;
-      }
-
-      const envelope = deps.store.saveSnapshot(snapshot);
-
-      const initialDeadline = snapshot.turnState.deadline;
-
-      if (
-        snapshot.turnState.awaitingAction &&
-        initialDeadline !== null &&
-        initialDeadline !== undefined
-      ) {
-        deps.timerSupervisor.register(sessionId, initialDeadline);
-      } else {
-        deps.timerSupervisor.clear(sessionId);
-      }
-
-      publishStateEvents(
-        {
-          sseGateway: deps.sseGateway,
-          ruleHints: deps.ruleHintService,
-        },
-        envelope.snapshot,
-        envelope.version,
-      );
-
-      return c.json(toSessionResponse(envelope), 201);
     }
 
-    return respondValidationError(c, check.code, check.message);
+    const sessionId = deps.generateSessionId();
+    const timestamp = deps.now();
+    const snapshot = createWaitingSnapshot(
+      sessionId,
+      maxPlayers,
+      timestamp,
+      payload.seed,
+    );
+
+    const envelope = deps.store.saveSnapshot(snapshot);
+
+    return c.json(
+      {
+        session_id: envelope.snapshot.sessionId,
+        state_version: envelope.version,
+        state: envelope.snapshot,
+      },
+      201,
+    );
   },
 );

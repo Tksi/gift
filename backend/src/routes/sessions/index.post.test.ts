@@ -32,17 +32,9 @@ type SessionResponse = {
   state: GameSnapshot;
 };
 
-type ErrorResponse = {
-  error: {
-    code: string;
-    reason_code: string;
-    instruction: string;
-  };
-};
-
 describe('POST /sessions', () => {
-  it('公平なセットアップで新規セッションを作成しスナップショットとバージョン情報を返す', async () => {
-    const { app, store, timerSupervisor } = createTestApp();
+  it('プレイヤー人数を指定してロビー状態のセッションを作成する', async () => {
+    const { app, store } = createTestApp();
 
     const response = await app.request('/sessions', {
       method: 'POST',
@@ -50,12 +42,8 @@ describe('POST /sessions', () => {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
+        max_players: 3,
         seed: 'unit-test-seed',
-        players: [
-          { id: 'alice', display_name: 'Alice' },
-          { id: 'bob', display_name: 'Bob' },
-          { id: 'carl', display_name: 'Carl' },
-        ],
       }),
     });
 
@@ -69,58 +57,25 @@ describe('POST /sessions', () => {
 
     expect(snapshot).toMatchObject({
       sessionId: 'session-test',
-      phase: 'setup',
+      phase: 'waiting',
       createdAt: '2025-01-01T00:00:00.000Z',
       updatedAt: '2025-01-01T00:00:00.000Z',
-      rngSeed: 'unit-test-seed',
+      maxPlayers: 3,
       centralPot: 0,
     });
 
-    expect(snapshot.turnState.turn).toBe(1);
-    expect(typeof snapshot.turnState.currentPlayerId).toBe('string');
-    expect(snapshot.turnState.currentPlayerIndex).toBe(0);
-    expect(snapshot.turnState.awaitingAction).toBe(true);
-    expect(typeof snapshot.turnState.cardInCenter).toBe('number');
-    expect(snapshot.turnState.deadline).toBe('2025-01-01T00:00:30.000Z');
-
-    expect(snapshot.players).toEqual([
-      { id: 'alice', displayName: 'Alice' },
-      { id: 'bob', displayName: 'Bob' },
-      { id: 'carl', displayName: 'Carl' },
-    ]);
-
-    expect(snapshot.playerOrder).toHaveLength(3);
-    expect(new Set(snapshot.playerOrder).size).toBe(3);
-
-    const deck = snapshot.deck;
-    const discardHidden = snapshot.discardHidden;
-
-    expect(deck).toHaveLength(23);
-    expect(deck).not.toContain(snapshot.turnState.cardInCenter);
-    expect(discardHidden).toHaveLength(9);
-    const combinedSource =
-      snapshot.turnState.cardInCenter === null
-        ? [...deck, ...discardHidden]
-        : [snapshot.turnState.cardInCenter, ...deck, ...discardHidden];
-    const combined = combinedSource.toSorted((a, b) => a - b);
-    expect(combined[0]).toBe(3);
-    expect(combined.at(-1)).toBe(35);
-    expect(new Set(combined).size).toBe(33);
-
-    const chips = snapshot.chips;
-    expect(chips).toEqual({ alice: 11, bob: 11, carl: 11 });
+    // ロビー状態なのでプレイヤーは空
+    expect(snapshot.players).toEqual([]);
+    expect(snapshot.playerOrder).toEqual([]);
+    expect(snapshot.deck).toEqual([]);
+    expect(snapshot.turnState.awaitingAction).toBe(false);
 
     const envelope = store.getEnvelope('session-test');
-
     expect(envelope?.version).toBe(payload.state_version);
     expect(envelope?.snapshot).toEqual(snapshot);
-    expect(timerSupervisor.register).toHaveBeenCalledWith(
-      'session-test',
-      '2025-01-01T00:00:30.000Z',
-    );
   });
 
-  it('プレイヤー数が不正な場合は 422 と理由コードを返す', async () => {
+  it('シードなしでもセッションを作成できる', async () => {
     const { app } = createTestApp();
 
     const response = await app.request('/sessions', {
@@ -129,26 +84,18 @@ describe('POST /sessions', () => {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        players: [{ id: 'solo', display_name: 'Solo Player' }],
+        max_players: 4,
       }),
     });
 
-    expect(response.status).toBe(422);
-    const payload = (await response.json()) as ErrorResponse;
-    expect(payload.error.code).toBe('PLAYER_COUNT_INVALID');
-    expect(payload.error.reason_code).toBe('REQUEST_INVALID');
-    expect(payload.error.instruction).toBe(
-      'Review the request payload and try again.',
-    );
+    expect(response.status).toBe(201);
+    const payload = (await response.json()) as SessionResponse;
+    expect(payload.state.maxPlayers).toBe(4);
+    expect(payload.state.rngSeed).toBe('');
   });
 
-  it('プレイヤー数が8名以上の場合も 422 と理由コードを返す', async () => {
+  it('プレイヤー数が1名の場合は 400 を返す（スキーマバリデーション）', async () => {
     const { app } = createTestApp();
-
-    const eightPlayers = Array.from({ length: 8 }, (_, i) => ({
-      id: `p${i + 1}`,
-      display_name: `Player ${i + 1}`,
-    }));
 
     const response = await app.request('/sessions', {
       method: 'POST',
@@ -156,13 +103,28 @@ describe('POST /sessions', () => {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        players: eightPlayers,
+        max_players: 1,
       }),
     });
 
-    expect(response.status).toBe(422);
-    const payload = (await response.json()) as ErrorResponse;
-    expect(payload.error.code).toBe('PLAYER_COUNT_INVALID');
-    expect(payload.error.reason_code).toBe('REQUEST_INVALID');
+    // Zodスキーマでmin(2)が設定されているため400が返る
+    expect(response.status).toBe(400);
+  });
+
+  it('プレイヤー数が8名以上の場合も 400 を返す（スキーマバリデーション）', async () => {
+    const { app } = createTestApp();
+
+    const response = await app.request('/sessions', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        max_players: 8,
+      }),
+    });
+
+    // Zodスキーマでmax(7)が設定されているため400が返る
+    expect(response.status).toBe(400);
   });
 });

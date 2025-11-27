@@ -3,6 +3,34 @@ import { ruleHintSchema, scoreSummarySchema, snapshotSchema } from './game.js';
 import { playerRegistrationSchema } from './players.js';
 
 export const createSessionBodySchema = z.object({
+  max_players: z.number().int().min(2).max(7).openapi({
+    description: '参加可能なプレイヤー数（2〜7人）。',
+  }),
+  seed: z.string().min(1).optional().openapi({
+    description: '任意の乱数シード文字列。同じシードで山札構成を再現します。',
+  }),
+});
+
+export const joinSessionBodySchema = z.object({
+  player_id: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[a-zA-Z0-9_-]+$/, {
+      message:
+        'Player id must include alphanumeric characters, underscore, or hyphen.',
+    })
+    .openapi({
+      description:
+        '英数字とアンダースコア・ハイフンのみ許可されるプレイヤーID。',
+    }),
+  display_name: z.string().min(1).max(64).openapi({
+    description: 'UI 上で表示するプレイヤー名。',
+  }),
+});
+
+// 下位互換性のため、players 配列を使った作成も残す
+export const createSessionWithPlayersBodySchema = z.object({
   players: z.array(playerRegistrationSchema).min(1).openapi({
     description: 'セッションへ参加させるプレイヤー情報の配列。2〜7 名を想定。',
   }),

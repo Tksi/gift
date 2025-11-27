@@ -67,24 +67,52 @@ type ErrorResponse = {
   };
 };
 
+/**
+ * ゲーム開始状態のセッションを作成するヘルパー。
+ * @param app アプリケーション。
+ * @param players プレイヤー情報。
+ */
+const createStartedSession = async (
+  app: ReturnType<typeof createTestApp>['app'],
+  players: { id: string; display_name: string }[],
+): Promise<SessionResponse> => {
+  // セッション作成
+  const createResponse = await app.request('/sessions', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ max_players: players.length }),
+  });
+  const createPayload = (await createResponse.json()) as SessionResponse;
+  const sessionId = createPayload.session_id;
+
+  // プレイヤー参加
+  for (const player of players) {
+    await app.request(`/sessions/${sessionId}/join`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        player_id: player.id,
+        display_name: player.display_name,
+      }),
+    });
+  }
+
+  // ゲーム開始
+  const startResponse = await app.request(`/sessions/${sessionId}/start`, {
+    method: 'POST',
+  });
+
+  return (await startResponse.json()) as SessionResponse;
+};
+
 describe('POST /sessions/{sessionId}/actions', () => {
   it('手番プレイヤーのアクションを反映し turn_context に主要情報を含めて返す', async () => {
     const { app } = createTestApp();
 
-    const createResponse = await app.request('/sessions', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        players: [
-          { id: 'alice', display_name: 'Alice' },
-          { id: 'bob', display_name: 'Bob' },
-        ],
-      }),
-    });
-
-    const created = (await createResponse.json()) as SessionResponse;
+    const created = await createStartedSession(app, [
+      { id: 'alice', display_name: 'Alice' },
+      { id: 'bob', display_name: 'Bob' },
+    ]);
 
     const actorId = created.state.turnState.currentPlayerId;
     const playerOrder = created.state.playerOrder;
@@ -126,20 +154,10 @@ describe('POST /sessions/{sessionId}/actions', () => {
   it('state_version が一致しない場合は 409 を返す', async () => {
     const { app } = createTestApp();
 
-    const createResponse = await app.request('/sessions', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        players: [
-          { id: 'alice', display_name: 'Alice' },
-          { id: 'bob', display_name: 'Bob' },
-        ],
-      }),
-    });
-
-    const created = (await createResponse.json()) as SessionResponse;
+    const created = await createStartedSession(app, [
+      { id: 'alice', display_name: 'Alice' },
+      { id: 'bob', display_name: 'Bob' },
+    ]);
 
     const actionResponse = await app.request(
       `/sessions/${created.session_id}/actions`,
@@ -195,20 +213,10 @@ describe('POST /sessions/{sessionId}/actions', () => {
     const gateway = createSseGatewayStub();
     const { app } = createTestApp({ sseGateway: gateway });
 
-    const createResponse = await app.request('/sessions', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        players: [
-          { id: 'alice', display_name: 'Alice' },
-          { id: 'bob', display_name: 'Bob' },
-        ],
-      }),
-    });
-
-    const created = (await createResponse.json()) as SessionResponse;
+    const created = await createStartedSession(app, [
+      { id: 'alice', display_name: 'Alice' },
+      { id: 'bob', display_name: 'Bob' },
+    ]);
 
     await app.request(`/sessions/${created.session_id}/actions`, {
       method: 'POST',

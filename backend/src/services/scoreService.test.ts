@@ -34,6 +34,7 @@ const createSnapshot = (
       awaitingAction: false,
     },
     finalResults: null,
+    maxPlayers: 3,
   };
 
   return {

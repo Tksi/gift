@@ -2,9 +2,10 @@ import { z } from '@hono/zod-openapi';
 import { playerSummarySchema } from './players.js';
 
 export const gamePhaseSchema = z
-  .enum(['setup', 'running', 'completed'])
+  .enum(['waiting', 'setup', 'running', 'completed'])
   .openapi({
-    description: 'ゲームの進行段階。セットアップ、進行中、終了のいずれか。',
+    description:
+      'ゲームの進行段階。待機中（参加待ち）、セットアップ、進行中、終了のいずれか。',
   });
 
 export const turnStateSchema = z.object({
@@ -142,5 +143,8 @@ export const snapshotSchema = z.object({
   }),
   finalResults: scoreSummarySchema.nullable().openapi({
     description: 'ゲーム終了後の最終結果。進行中は null。',
+  }),
+  maxPlayers: z.number().int().min(2).max(7).openapi({
+    description: 'このセッションに参加可能な最大プレイヤー数。',
   }),
 });

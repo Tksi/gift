@@ -37,6 +37,7 @@ const makeSnapshot = ({
   createdAt: '2025-01-01T00:00:00.000Z',
   updatedAt,
   finalResults: null,
+  maxPlayers: 2,
 });
 
 const makeLogEntry = (

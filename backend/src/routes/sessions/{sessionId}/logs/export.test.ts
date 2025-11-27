@@ -39,6 +39,7 @@ const seedSession = (store: ReturnType<typeof createInMemoryGameStore>) => {
     createdAt: '2025-01-01T00:00:00.000Z',
     updatedAt: '2025-01-01T00:10:00.000Z',
     finalResults: null,
+    maxPlayers: 2,
   };
   store.saveSnapshot(snapshot);
   store.appendEventLog(snapshot.sessionId, [

@@ -5,13 +5,26 @@ import SessionForm from './SessionForm.vue';
 
 describe('SessionForm', () => {
   describe('初期表示', () => {
-    it('2人分の入力フィールドが表示される', () => {
+    it('プレイヤー人数選択ボタンが 2〜7 人分表示される', () => {
       const wrapper = mount(SessionForm, {
         props: { isSubmitting: false },
       });
 
-      const playerFields = wrapper.findAll('[data-testid="player-field"]');
-      expect(playerFields).toHaveLength(2);
+      // 2〜7の6つのボタンがあることを確認
+      for (let i = 2; i <= 7; i++) {
+        expect(wrapper.find(`[data-testid="player-count-${i}"]`).exists()).toBe(
+          true,
+        );
+      }
+    });
+
+    it('デフォルトで3人が選択されている', () => {
+      const wrapper = mount(SessionForm, {
+        props: { isSubmitting: false },
+      });
+
+      const button3 = wrapper.find('[data-testid="player-count-3"]');
+      expect(button3.classes()).toContain('border-blue-600');
     });
 
     it('送信ボタンが表示される', () => {
@@ -23,119 +36,21 @@ describe('SessionForm', () => {
     });
   });
 
-  describe('プレイヤー追加/削除', () => {
-    it('プレイヤー追加ボタンでフィールドが増える', async () => {
+  describe('プレイヤー人数選択', () => {
+    it('人数ボタンをクリックすると選択状態が変わる', async () => {
       const wrapper = mount(SessionForm, {
         props: { isSubmitting: false },
       });
 
-      await wrapper.find('[data-testid="add-player-button"]').trigger('click');
+      const button5 = wrapper.find('[data-testid="player-count-5"]');
+      await button5.trigger('click');
 
-      const playerFields = wrapper.findAll('[data-testid="player-field"]');
-      expect(playerFields).toHaveLength(3);
-    });
+      // 5人ボタンが選択状態になる
+      expect(button5.classes()).toContain('border-blue-600');
 
-    it('プレイヤー削除ボタンでフィールドが減る', async () => {
-      const wrapper = mount(SessionForm, {
-        props: { isSubmitting: false },
-      });
-
-      // まず3人に増やす
-      await wrapper.find('[data-testid="add-player-button"]').trigger('click');
-
-      // 削除ボタンをクリック (最初のプレイヤーを削除)
-      await wrapper
-        .findAll('[data-testid="remove-player-button"]')[0]
-        ?.trigger('click');
-
-      const playerFields = wrapper.findAll('[data-testid="player-field"]');
-      expect(playerFields).toHaveLength(2);
-    });
-
-    it('7人を超えて追加できない', async () => {
-      const wrapper = mount(SessionForm, {
-        props: { isSubmitting: false },
-      });
-
-      // 5人追加して7人に
-      for (let i = 0; i < 5; i++) {
-        await wrapper
-          .find('[data-testid="add-player-button"]')
-          .trigger('click');
-      }
-
-      const addButton = wrapper.find('[data-testid="add-player-button"]');
-      expect(addButton.attributes('disabled')).toBeDefined();
-    });
-
-    it('2人未満に削除できない', async () => {
-      const wrapper = mount(SessionForm, {
-        props: { isSubmitting: false },
-      });
-
-      // 2人のときは削除ボタンが無効
-      const removeButtons = wrapper.findAll(
-        '[data-testid="remove-player-button"]',
-      );
-      expect(
-        removeButtons.every((btn) => btn.attributes('disabled') !== undefined),
-      ).toBe(true);
-    });
-  });
-
-  describe('バリデーション', () => {
-    it('プレイヤーIDが重複している場合はエラーを表示する', async () => {
-      const wrapper = mount(SessionForm, {
-        props: { isSubmitting: false },
-      });
-
-      const inputs = wrapper.findAll('[data-testid="player-id-input"]');
-
-      // 両方に同じIDを入力
-      await inputs[0]?.setValue('player1');
-      await inputs[1]?.setValue('player1');
-
-      expect(wrapper.text()).toContain('プレイヤーIDが重複しています');
-    });
-
-    it('空のIDではエラーを表示しない', async () => {
-      const wrapper = mount(SessionForm, {
-        props: { isSubmitting: false },
-      });
-
-      // 初期状態（空のID）ではエラー非表示
-      expect(wrapper.text()).not.toContain('プレイヤーIDが重複しています');
-    });
-
-    it('すべてのフィールドが入力されていない場合は送信ボタンが無効', async () => {
-      const wrapper = mount(SessionForm, {
-        props: { isSubmitting: false },
-      });
-
-      // IDのみ入力、表示名未入力
-      const idInputs = wrapper.findAll('[data-testid="player-id-input"]');
-      await idInputs[0]?.setValue('player1');
-      await idInputs[1]?.setValue('player2');
-
-      const submitButton = wrapper.find('[data-testid="submit-button"]');
-      expect(submitButton.attributes('disabled')).toBeDefined();
-    });
-
-    it('IDと表示名が重複なしで入力されている場合は送信ボタンが有効', async () => {
-      const wrapper = mount(SessionForm, {
-        props: { isSubmitting: false },
-      });
-
-      const idInputs = wrapper.findAll('[data-testid="player-id-input"]');
-      const nameInputs = wrapper.findAll('[data-testid="player-name-input"]');
-
-      await idInputs[0]?.setValue('player1');
-      await nameInputs[0]?.setValue('プレイヤー1');
-      await idInputs[1]?.setValue('player2');
-      await nameInputs[1]?.setValue('プレイヤー2');
-
-      const submitButton = wrapper.find('[data-testid="submit-button"]');
-      expect(submitButton.attributes('disabled')).toBeUndefined();
+      // 3人ボタンは非選択状態になる
+      const button3 = wrapper.find('[data-testid="player-count-3"]');
+      expect(button3.classes()).not.toContain('border-blue-600');
     });
   });
 
@@ -145,24 +60,25 @@ describe('SessionForm', () => {
         props: { isSubmitting: false },
       });
 
-      const idInputs = wrapper.findAll('[data-testid="player-id-input"]');
-      const nameInputs = wrapper.findAll('[data-testid="player-name-input"]');
-
-      await idInputs[0]?.setValue('player1');
-      await nameInputs[0]?.setValue('プレイヤー1');
-      await idInputs[1]?.setValue('player2');
-      await nameInputs[1]?.setValue('プレイヤー2');
-
-      // フォームのsubmitイベントをトリガー
+      // デフォルト（3人）のまま送信
       await wrapper.find('form').trigger('submit');
 
       expect(wrapper.emitted('submit')).toHaveLength(1);
-      expect(wrapper.emitted('submit')?.[0]).toEqual([
-        [
-          { id: 'player1', display_name: 'プレイヤー1' },
-          { id: 'player2', display_name: 'プレイヤー2' },
-        ],
-      ]);
+      expect(wrapper.emitted('submit')?.[0]).toEqual([3]);
+    });
+
+    it('選択した人数で submit イベントを発火する', async () => {
+      const wrapper = mount(SessionForm, {
+        props: { isSubmitting: false },
+      });
+
+      // 5人を選択
+      await wrapper.find('[data-testid="player-count-5"]').trigger('click');
+
+      // フォーム送信
+      await wrapper.find('form').trigger('submit');
+
+      expect(wrapper.emitted('submit')?.[0]).toEqual([5]);
     });
   });
 
@@ -186,7 +102,7 @@ describe('SessionForm', () => {
   });
 
   describe('タッチ操作対応', () => {
-    it('送信ボタンは最小 44x44px のサイズを持つ', () => {
+    it('送信ボタンは最小 44px の高さを持つ', () => {
       const wrapper = mount(SessionForm, {
         props: { isSubmitting: false },
       });
@@ -196,22 +112,18 @@ describe('SessionForm', () => {
       expect(submitButton.classes()).toContain('min-h-11');
     });
 
-    it('追加/削除ボタンは最小 44x44px のサイズを持つ', async () => {
+    it('人数選択ボタンは最小 44x44px のサイズを持つ', () => {
       const wrapper = mount(SessionForm, {
         props: { isSubmitting: false },
       });
 
-      // 3人にして削除ボタンを有効化
-      await wrapper.find('[data-testid="add-player-button"]').trigger('click');
-
-      const addButton = wrapper.find('[data-testid="add-player-button"]');
-      const removeButtons = wrapper.findAll(
-        '[data-testid="remove-player-button"]',
-      );
-
-      expect(addButton.classes()).toContain('min-h-11');
+      const countButtons = wrapper.findAll('[data-testid^="player-count-"]');
       expect(
-        removeButtons.some((btn) => btn.classes().includes('min-h-11')),
+        countButtons.every(
+          (btn) =>
+            btn.classes().includes('min-h-11') &&
+            btn.classes().includes('min-w-11'),
+        ),
       ).toBe(true);
     });
   });

@@ -20,26 +20,44 @@ type HintResponse = {
   };
 };
 
+/**
+ * ゲーム開始状態のセッションを作成するヘルパー。
+ */
 const createSession = async () => {
   const app = createApp({
     now: () => '2025-01-01T00:00:00.000Z',
     generateSessionId: () => 'session-hint',
   });
 
-  const response = await app.request('/sessions', {
+  // セッション作成
+  const createResponse = await app.request('/sessions', {
     method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      players: [
-        { id: 'alice', display_name: 'Alice' },
-        { id: 'bob', display_name: 'Bob' },
-      ],
-    }),
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ max_players: 2 }),
   });
+  const createPayload = (await createResponse.json()) as SessionResponse;
+  const sessionId = createPayload.session_id;
 
-  const session = (await response.json()) as SessionResponse;
+  // プレイヤー参加
+  for (const player of [
+    { id: 'alice', display_name: 'Alice' },
+    { id: 'bob', display_name: 'Bob' },
+  ]) {
+    await app.request(`/sessions/${sessionId}/join`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        player_id: player.id,
+        display_name: player.display_name,
+      }),
+    });
+  }
+
+  // ゲーム開始
+  const startResponse = await app.request(`/sessions/${sessionId}/start`, {
+    method: 'POST',
+  });
+  const session = (await startResponse.json()) as SessionResponse;
 
   return { app, session };
 };

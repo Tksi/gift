@@ -100,18 +100,44 @@ const createTestApp = (overrides: Partial<CreateAppOptions> = {}) => {
   return { app };
 };
 
+/**
+ * セッションを作成し、プレイヤーを参加させ、ゲームを開始するヘルパー。
+ * @param app アプリケーション。
+ * @param players プレイヤー情報。
+ * @param seed 乱数シード。
+ */
 const postSession = async (
   app: ReturnType<typeof createTestApp>['app'],
   players: { id: string; display_name: string }[],
   seed: string,
 ) => {
-  const response = await app.request('/sessions', {
+  // セッション作成
+  const createResponse = await app.request('/sessions', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ seed, players }),
+    body: JSON.stringify({ max_players: players.length, seed }),
+  });
+  const createPayload = (await createResponse.json()) as SessionResponse;
+  const sessionId = createPayload.session_id;
+
+  // プレイヤー参加
+  for (const player of players) {
+    await app.request(`/sessions/${sessionId}/join`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        player_id: player.id,
+        display_name: player.display_name,
+      }),
+    });
+  }
+
+  // ゲーム開始
+  const startResponse = await app.request(`/sessions/${sessionId}/start`, {
+    method: 'POST',
   });
 
-  return (await response.json()) as SessionResponse;
+  return (await startResponse.json()) as SessionResponse;
 };
 
 const postAction = async (
@@ -442,31 +468,66 @@ describe('フルゲーム統合テスト', () => {
     const firstReader = createSseReader(firstResponse.body!);
 
     // 初期イベント (state.delta と rule.hint) を取得
-    const initialState = await firstReader.readEvent();
+    // join 時のイベントも履歴にあるため、setup/running フェーズの state.delta を探す
+    let initialStateData: SessionResponse | null = null;
 
-    expect(initialState?.event).toBe('state.delta');
+    while (true) {
+      const event = await firstReader.readEvent();
 
+      if (!event) {
+        throw new Error('Expected state.delta event not found');
+      }
+
+      if (event.event === 'state.delta') {
+        const data = JSON.parse(event.data) as SessionResponse;
+
+        if (data.state.phase === 'setup' || data.state.phase === 'running') {
+          initialStateData = data;
+
+          break;
+        }
+      }
+    }
+
+    expect(initialStateData).not.toBeNull();
+    const currentVersion = initialStateData.state_version;
+    const firstPlayerId = initialStateData.state.turnState.currentPlayerId;
+
+    // rule.hint を取得
     const initialHint = await firstReader.readEvent();
 
     expect(initialHint?.event).toBe('rule.hint');
 
     // アクションを実行してイベントを生成
-    const firstPlayerId = session.state.turnState.currentPlayerId;
     const actionResult = await postAction(
       app,
       session.session_id,
       'cmd-sse-1',
-      session.state_version,
+      currentVersion,
       firstPlayerId,
       'placeChip',
     );
 
     expect(actionResult.status).toBe(200);
 
-    // イベントログを受信
-    const logEvent = await firstReader.readEvent();
+    // アクション後の event.log を受信（他のイベントをスキップ）
+    let logEvent: SseEvent | null = null;
 
-    expect(logEvent?.event).toBe('event.log');
+    for (let i = 0; i < 20; i += 1) {
+      const event = await firstReader.readEvent();
+
+      if (!event) {
+        break;
+      }
+
+      if (event.event === 'event.log') {
+        logEvent = event;
+
+        break;
+      }
+    }
+
+    expect(logEvent).not.toBeNull();
     expect(logEvent?.id).toBeTruthy();
 
     const logEventId = logEvent!.id;
@@ -502,14 +563,25 @@ describe('フルゲーム統合テスト', () => {
     const reconnectReader = createSseReader(reconnectResponse.body!);
 
     // 再接続後にイベントを収集して event.log を確認
+    // 非同期で書き込まれる event.log を待つため、タイムアウト付きで収集
     const collectedEvents: SseEvent[] = [];
     let foundReplayedLog = false;
 
-    for (let i = 0; i < 10; i += 1) {
-      const event = await reconnectReader.readEvent();
+    const readWithTimeout = async (
+      timeoutMs: number,
+    ): Promise<SseEvent | null> => {
+      const timeoutPromise = new Promise<null>((resolve) =>
+        setTimeout(() => resolve(null), timeoutMs),
+      );
+
+      return Promise.race([reconnectReader.readEvent(), timeoutPromise]);
+    };
+
+    for (let i = 0; i < 30; i += 1) {
+      const event = await readWithTimeout(100);
 
       if (!event) {
-        break;
+        continue; // タイムアウトした場合は続行（まだイベントが来る可能性がある）
       }
 
       collectedEvents.push(event);

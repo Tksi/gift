@@ -37,6 +37,7 @@ const createSnapshot = (override: SnapshotOverride = {}): GameSnapshot => {
       awaitingAction: true,
     },
     finalResults: null,
+    maxPlayers: 2,
   };
 
   return {

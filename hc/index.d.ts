@@ -3328,6 +3328,7 @@ declare module 'zod' {
 //#endregion
 //#region src/schema/game.d.ts
 declare const gamePhaseSchema: ZodEnum<{
+  waiting: "waiting";
   setup: "setup";
   running: "running";
   completed: "completed";
@@ -3335,6 +3336,7 @@ declare const gamePhaseSchema: ZodEnum<{
 declare const snapshotSchema: ZodObject<{
   sessionId: ZodString;
   phase: ZodEnum<{
+    waiting: "waiting";
     setup: "setup";
     running: "running";
     completed: "completed";
@@ -3376,6 +3378,7 @@ declare const snapshotSchema: ZodObject<{
       winner: ZodNullable<ZodString>;
     }, $strip>>;
   }, $strip>>;
+  maxPlayers: ZodNumber;
 }, $strip>;
 //#endregion
 //#region src/states/inMemoryGameStore.d.ts
@@ -3622,6 +3625,230 @@ declare const createApp: (options?: CreateAppOptions) => Hono$1<SessionEnv, Merg
     };
   };
 }, "/"> & MergeSchemaPath<{
+  "/sessions/:sessionId/start": {
+    $post: {
+      input: {
+        param: {
+          sessionId: string;
+        };
+      };
+      output: {
+        error: {
+          code: string;
+          message: string;
+          reason_code: string;
+          instruction: string;
+        };
+      };
+      outputFormat: "json";
+      status: 422;
+    } | {
+      input: {
+        param: {
+          sessionId: string;
+        };
+      };
+      output: {
+        session_id: string;
+        state_version: string;
+        state: {
+          sessionId: string;
+          phase: "waiting" | "setup" | "running" | "completed";
+          deck: number[];
+          discardHidden: number[];
+          playerOrder: string[];
+          rngSeed: string;
+          players: {
+            id: string;
+            displayName: string;
+          }[];
+          chips: {
+            [x: string]: number;
+          };
+          hands: {
+            [x: string]: number[];
+          };
+          centralPot: number;
+          turnState: {
+            turn: number;
+            currentPlayerId: string;
+            currentPlayerIndex: number;
+            cardInCenter: number | null;
+            awaitingAction: boolean;
+            deadline?: string | null | undefined;
+          };
+          createdAt: string;
+          updatedAt: string;
+          finalResults: {
+            placements: {
+              rank: number;
+              playerId: string;
+              score: number;
+              chipsRemaining: number;
+              cards: number[];
+              cardSets: number[][];
+            }[];
+            tieBreak: {
+              reason: "chipCount";
+              tiedScore: number;
+              contenders: string[];
+              winner: string | null;
+            } | null;
+          } | null;
+          maxPlayers: number;
+        };
+      };
+      outputFormat: "json";
+      status: 200;
+    } | {
+      input: {
+        param: {
+          sessionId: string;
+        };
+      };
+      output: {
+        error: {
+          code: string;
+          message: string;
+          reason_code: string;
+          instruction: string;
+        };
+      };
+      outputFormat: "json";
+      status: 404;
+    };
+  };
+}, "/"> & MergeSchemaPath<{
+  "/sessions/:sessionId/join": {
+    $post: {
+      input: {
+        param: {
+          sessionId: string;
+        };
+      } & {
+        json: {
+          player_id: string;
+          display_name: string;
+        };
+      };
+      output: {
+        error: {
+          code: string;
+          message: string;
+          reason_code: string;
+          instruction: string;
+        };
+      };
+      outputFormat: "json";
+      status: 422;
+    } | {
+      input: {
+        param: {
+          sessionId: string;
+        };
+      } & {
+        json: {
+          player_id: string;
+          display_name: string;
+        };
+      };
+      output: {
+        session_id: string;
+        state_version: string;
+        state: {
+          sessionId: string;
+          phase: "waiting" | "setup" | "running" | "completed";
+          deck: number[];
+          discardHidden: number[];
+          playerOrder: string[];
+          rngSeed: string;
+          players: {
+            id: string;
+            displayName: string;
+          }[];
+          chips: {
+            [x: string]: number;
+          };
+          hands: {
+            [x: string]: number[];
+          };
+          centralPot: number;
+          turnState: {
+            turn: number;
+            currentPlayerId: string;
+            currentPlayerIndex: number;
+            cardInCenter: number | null;
+            awaitingAction: boolean;
+            deadline?: string | null | undefined;
+          };
+          createdAt: string;
+          updatedAt: string;
+          finalResults: {
+            placements: {
+              rank: number;
+              playerId: string;
+              score: number;
+              chipsRemaining: number;
+              cards: number[];
+              cardSets: number[][];
+            }[];
+            tieBreak: {
+              reason: "chipCount";
+              tiedScore: number;
+              contenders: string[];
+              winner: string | null;
+            } | null;
+          } | null;
+          maxPlayers: number;
+        };
+      };
+      outputFormat: "json";
+      status: 200;
+    } | {
+      input: {
+        param: {
+          sessionId: string;
+        };
+      } & {
+        json: {
+          player_id: string;
+          display_name: string;
+        };
+      };
+      output: {
+        error: {
+          code: string;
+          message: string;
+          reason_code: string;
+          instruction: string;
+        };
+      };
+      outputFormat: "json";
+      status: 404;
+    } | {
+      input: {
+        param: {
+          sessionId: string;
+        };
+      } & {
+        json: {
+          player_id: string;
+          display_name: string;
+        };
+      };
+      output: {
+        error: {
+          code: string;
+          message: string;
+          reason_code: string;
+          instruction: string;
+        };
+      };
+      outputFormat: "json";
+      status: 409;
+    };
+  };
+}, "/"> & MergeSchemaPath<{
   "/sessions/:sessionId/results": {
     $get: {
       input: {
@@ -3761,7 +3988,7 @@ declare const createApp: (options?: CreateAppOptions) => Hono$1<SessionEnv, Merg
         state_version: string;
         state: {
           sessionId: string;
-          phase: "setup" | "running" | "completed";
+          phase: "waiting" | "setup" | "running" | "completed";
           deck: number[];
           discardHidden: number[];
           playerOrder: string[];
@@ -3803,6 +4030,7 @@ declare const createApp: (options?: CreateAppOptions) => Hono$1<SessionEnv, Merg
               winner: string | null;
             } | null;
           } | null;
+          maxPlayers: number;
         };
         turn_context: {
           turn: number;
@@ -3923,7 +4151,7 @@ declare const createApp: (options?: CreateAppOptions) => Hono$1<SessionEnv, Merg
         state_version: string;
         state: {
           sessionId: string;
-          phase: "setup" | "running" | "completed";
+          phase: "waiting" | "setup" | "running" | "completed";
           deck: number[];
           discardHidden: number[];
           playerOrder: string[];
@@ -3965,6 +4193,7 @@ declare const createApp: (options?: CreateAppOptions) => Hono$1<SessionEnv, Merg
               winner: string | null;
             } | null;
           } | null;
+          maxPlayers: number;
         };
       };
       outputFormat: "json";
@@ -4009,7 +4238,7 @@ declare const createApp: (options?: CreateAppOptions) => Hono$1<SessionEnv, Merg
         state_version: string;
         state: {
           sessionId: string;
-          phase: "setup" | "running" | "completed";
+          phase: "waiting" | "setup" | "running" | "completed";
           deck: number[];
           discardHidden: number[];
           playerOrder: string[];
@@ -4051,6 +4280,7 @@ declare const createApp: (options?: CreateAppOptions) => Hono$1<SessionEnv, Merg
               winner: string | null;
             } | null;
           } | null;
+          maxPlayers: number;
         };
       };
       outputFormat: "json";
@@ -4078,10 +4308,7 @@ declare const createApp: (options?: CreateAppOptions) => Hono$1<SessionEnv, Merg
     $post: {
       input: {
         json: {
-          players: {
-            id: string;
-            display_name: string;
-          }[];
+          max_players: number;
           seed?: string | undefined;
         };
       };
@@ -4090,7 +4317,7 @@ declare const createApp: (options?: CreateAppOptions) => Hono$1<SessionEnv, Merg
         state_version: string;
         state: {
           sessionId: string;
-          phase: "setup" | "running" | "completed";
+          phase: "waiting" | "setup" | "running" | "completed";
           deck: number[];
           discardHidden: number[];
           playerOrder: string[];
@@ -4132,6 +4359,7 @@ declare const createApp: (options?: CreateAppOptions) => Hono$1<SessionEnv, Merg
               winner: string | null;
             } | null;
           } | null;
+          maxPlayers: number;
         };
       };
       outputFormat: "json";
@@ -4139,10 +4367,7 @@ declare const createApp: (options?: CreateAppOptions) => Hono$1<SessionEnv, Merg
     } | {
       input: {
         json: {
-          players: {
-            id: string;
-            display_name: string;
-          }[];
+          max_players: number;
           seed?: string | undefined;
         };
       };

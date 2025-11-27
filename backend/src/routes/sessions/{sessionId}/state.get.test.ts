@@ -32,24 +32,52 @@ type ErrorResponse = {
   };
 };
 
+/**
+ * ゲーム開始状態のセッションを作成するヘルパー。
+ * @param app アプリケーション。
+ * @param players プレイヤー情報。
+ */
+const createStartedSession = async (
+  app: ReturnType<typeof createTestApp>['app'],
+  players: { id: string; display_name: string }[],
+): Promise<SessionResponse> => {
+  // セッション作成
+  const createResponse = await app.request('/sessions', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ max_players: players.length }),
+  });
+  const createPayload = (await createResponse.json()) as SessionResponse;
+  const sessionId = createPayload.session_id;
+
+  // プレイヤー参加
+  for (const player of players) {
+    await app.request(`/sessions/${sessionId}/join`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        player_id: player.id,
+        display_name: player.display_name,
+      }),
+    });
+  }
+
+  // ゲーム開始
+  const startResponse = await app.request(`/sessions/${sessionId}/start`, {
+    method: 'POST',
+  });
+
+  return (await startResponse.json()) as SessionResponse;
+};
+
 describe('GET /sessions/{sessionId}/state', () => {
   it('最新スナップショットを返し ETag をヘッダーへ付与する', async () => {
     const { app } = createTestApp();
 
-    const createResponse = await app.request('/sessions', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        players: [
-          { id: 'alice', display_name: 'Alice' },
-          { id: 'bob', display_name: 'Bob' },
-        ],
-      }),
-    });
-
-    const created = (await createResponse.json()) as SessionResponse;
+    const created = await createStartedSession(app, [
+      { id: 'alice', display_name: 'Alice' },
+      { id: 'bob', display_name: 'Bob' },
+    ]);
     const expectedEtag = `"${created.state_version}"`;
 
     const response = await app.request(`/sessions/${created.session_id}/state`);
@@ -65,20 +93,10 @@ describe('GET /sessions/{sessionId}/state', () => {
   it('ETag が一致する場合は 304 を返す', async () => {
     const { app } = createTestApp();
 
-    const createResponse = await app.request('/sessions', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        players: [
-          { id: 'alice', display_name: 'Alice' },
-          { id: 'bob', display_name: 'Bob' },
-        ],
-      }),
-    });
-
-    const created = (await createResponse.json()) as SessionResponse;
+    const created = await createStartedSession(app, [
+      { id: 'alice', display_name: 'Alice' },
+      { id: 'bob', display_name: 'Bob' },
+    ]);
     const expectedEtag = `"${created.state_version}"`;
 
     const response = await app.request(

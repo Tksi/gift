@@ -36,20 +36,35 @@ describe('GET /sessions/{sessionId}', () => {
   it('ID で取得すると保存済みセッションを返す', async () => {
     const { app } = createTestApp();
 
+    // セッション作成
     const createResponse = await app.request('/sessions', {
       method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        players: [
-          { id: 'alice', display_name: 'Alice' },
-          { id: 'bob', display_name: 'Bob' },
-        ],
-      }),
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ max_players: 2 }),
     });
+    const createPayload = (await createResponse.json()) as SessionResponse;
+    const sessionId = createPayload.session_id;
 
-    const created = (await createResponse.json()) as SessionResponse;
+    // プレイヤー参加
+    for (const player of [
+      { id: 'alice', display_name: 'Alice' },
+      { id: 'bob', display_name: 'Bob' },
+    ]) {
+      await app.request(`/sessions/${sessionId}/join`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          player_id: player.id,
+          display_name: player.display_name,
+        }),
+      });
+    }
+
+    // ゲーム開始
+    const startResponse = await app.request(`/sessions/${sessionId}/start`, {
+      method: 'POST',
+    });
+    const created = (await startResponse.json()) as SessionResponse;
 
     const fetchResponse = await app.request(`/sessions/${created.session_id}`);
 

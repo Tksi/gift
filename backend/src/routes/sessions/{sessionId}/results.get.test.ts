@@ -60,6 +60,7 @@ describe('GET /sessions/:id/results', () => {
       createdAt: '2025-01-01T00:00:00.000Z',
       updatedAt: '2025-01-01T00:10:00.000Z',
       finalResults: sampleResults,
+      maxPlayers: 2,
     };
     store.saveSnapshot(snapshot);
     store.appendEventLog(snapshot.sessionId, [
@@ -112,6 +113,7 @@ describe('GET /sessions/:id/results', () => {
       createdAt: '2025-01-01T00:00:00.000Z',
       updatedAt: '2025-01-01T00:00:00.000Z',
       finalResults: null,
+      maxPlayers: 2,
     });
 
     const response = await app.request('/sessions/session-pending/results');
