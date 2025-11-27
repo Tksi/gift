@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { Scalar } from '@scalar/hono-api-reference';
+import { cors } from 'hono/cors';
 import { sessionPostApp } from 'routes/sessions/index.post.js';
 import { createSessionDepsMiddleware } from 'routes/sessions/types.js';
 import { sessionActionsPostApp } from 'routes/sessions/{sessionId}/actions.post.js';
@@ -137,6 +138,7 @@ export const createApp = (options: CreateAppOptions = {}) => {
 
   // 依存注入ミドルウェアを /sessions* パスに適用
   const app = new OpenAPIHono<SessionEnv>();
+  app.use('*', cors());
   app.use('/sessions/*', createSessionDepsMiddleware(sessionDependencies));
   app.use('/sessions', createSessionDepsMiddleware(sessionDependencies));
 
