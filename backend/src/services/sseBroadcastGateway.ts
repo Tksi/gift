@@ -1,0 +1,296 @@
+import type { ErrorDetail } from 'services/errors.js';
+import type { MonitoringService } from 'services/monitoringService.js';
+import type { RuleHint } from 'services/ruleHintService.js';
+import type { EventLogEntry, GameSnapshot } from 'states/inMemoryGameStore.js';
+
+export type SseEventPayload = {
+  id: string;
+  event: string;
+  data: string;
+};
+
+type SseConnection = {
+  sessionId: string;
+  send: (event: SseEventPayload) => void;
+};
+
+type ConnectOptions = {
+  sessionId: string;
+  lastEventId?: string;
+  send: (event: SseEventPayload) => void;
+};
+
+export type SseBroadcastGateway = {
+  connect: (options: ConnectOptions) => { disconnect: () => void };
+  publishStateDelta: (
+    sessionId: string,
+    snapshot: GameSnapshot,
+    version: string,
+  ) => void;
+  publishStateFinal: (
+    sessionId: string,
+    snapshot: GameSnapshot,
+    version: string,
+  ) => void;
+  publishSystemError: (sessionId: string, payload: ErrorDetail) => void;
+  publishEventLog: (sessionId: string, entry: EventLogEntry) => void;
+  publishRuleHint: (
+    sessionId: string,
+    payload: { stateVersion: string; hint: RuleHint },
+  ) => void;
+};
+
+const MAX_EVENT_HISTORY = 100;
+
+const cloneValue = <T>(value: T): T => structuredClone(value);
+
+const createStateDeltaEvent = (
+  sessionId: string,
+  snapshot: GameSnapshot,
+  version: string,
+): SseEventPayload => ({
+  id: `state:${version}`,
+  event: 'state.delta',
+  data: JSON.stringify({
+    session_id: sessionId,
+    state_version: version,
+    state: cloneValue(snapshot),
+  }),
+});
+
+const createStateFinalEvent = (
+  sessionId: string,
+  snapshot: GameSnapshot,
+  version: string,
+): SseEventPayload | null => {
+  if (snapshot.finalResults === null) {
+    return null;
+  }
+
+  return {
+    id: `state-final:${version}`,
+    event: 'state.final',
+    data: JSON.stringify({
+      session_id: sessionId,
+      state_version: version,
+      final_results: cloneValue(snapshot.finalResults),
+    }),
+  };
+};
+
+const createSystemErrorEvent = (
+  sessionId: string,
+  payload: ErrorDetail,
+): SseEventPayload => ({
+  id: `system-error:${Date.now().toString(16)}`,
+  event: 'system.error',
+  data: JSON.stringify({
+    session_id: sessionId,
+    error: payload,
+  }),
+});
+
+const createRuleHintEvent = (
+  sessionId: string,
+  payload: { stateVersion: string; hint: RuleHint },
+): SseEventPayload => ({
+  id: `rule-hint:${payload.stateVersion}`,
+  event: 'rule.hint',
+  data: JSON.stringify({
+    session_id: sessionId,
+    state_version: payload.stateVersion,
+    hint: {
+      text: payload.hint.text,
+      emphasis: payload.hint.emphasis,
+      turn: payload.hint.turn,
+      generated_at: payload.hint.generatedAt,
+    },
+  }),
+});
+
+export type SseBroadcastGatewayDependencies = {
+  monitoring?: MonitoringService;
+};
+
+/**
+ * SSE 接続の登録とイベント履歴の管理を行うブロードキャストゲートウェイを構築する。
+ * @param dependencies モニタリングサービスなどのオプション依存性。
+ */
+export const createSseBroadcastGateway = (
+  dependencies: SseBroadcastGatewayDependencies = {},
+): SseBroadcastGateway => {
+  const connections = new Map<string, Set<SseConnection>>();
+  const history = new Map<string, SseEventPayload[]>();
+
+  const getConnectionCount = (sessionId: string): number =>
+    connections.get(sessionId)?.size ?? 0;
+
+  const appendHistory = (sessionId: string, event: SseEventPayload) => {
+    const events = history.get(sessionId) ?? [];
+    events.push(event);
+
+    if (events.length > MAX_EVENT_HISTORY) {
+      events.splice(0, events.length - MAX_EVENT_HISTORY);
+    }
+
+    history.set(sessionId, events);
+  };
+
+  const broadcast = (
+    sessionId: string,
+    event: SseEventPayload,
+    options: { remember?: boolean } = {},
+  ) => {
+    const shouldRemember = options.remember ?? true;
+
+    if (shouldRemember) {
+      appendHistory(sessionId, event);
+    }
+
+    const listeners = connections.get(sessionId);
+
+    if (!listeners) {
+      return;
+    }
+
+    for (const listener of listeners) {
+      listener.send(event);
+    }
+  };
+
+  const replayHistory = (
+    sessionId: string,
+    send: (event: SseEventPayload) => void,
+    lastEventId?: string,
+  ) => {
+    const events = history.get(sessionId);
+
+    if (!events || events.length === 0) {
+      return;
+    }
+
+    if (lastEventId === undefined) {
+      for (const event of events) {
+        send(event);
+      }
+
+      return;
+    }
+
+    const index = events.findIndex((event) => event.id === lastEventId);
+
+    if (index === -1) {
+      for (const event of events) {
+        send(event);
+      }
+
+      return;
+    }
+
+    for (let offset = index + 1; offset < events.length; offset += 1) {
+      const event = events[offset];
+
+      if (!event) {
+        continue;
+      }
+
+      send(event);
+    }
+  };
+
+  const connect = (options: ConnectOptions) => {
+    const listeners =
+      connections.get(options.sessionId) ?? new Set<SseConnection>();
+    const connection: SseConnection = {
+      sessionId: options.sessionId,
+      send: options.send,
+    };
+
+    listeners.add(connection);
+    connections.set(options.sessionId, listeners);
+
+    const connectionCount = getConnectionCount(options.sessionId);
+    dependencies.monitoring?.logSseConnectionChange({
+      sessionId: options.sessionId,
+      action: 'connect',
+      connectionCount,
+    });
+
+    replayHistory(options.sessionId, options.send, options.lastEventId);
+
+    const disconnect = () => {
+      const current = connections.get(options.sessionId);
+
+      if (!current) {
+        return;
+      }
+
+      current.delete(connection);
+
+      if (current.size === 0) {
+        connections.delete(options.sessionId);
+      }
+
+      const newConnectionCount = getConnectionCount(options.sessionId);
+      dependencies.monitoring?.logSseConnectionChange({
+        sessionId: options.sessionId,
+        action: 'disconnect',
+        connectionCount: newConnectionCount,
+      });
+    };
+
+    return { disconnect };
+  };
+
+  const publishStateDelta = (
+    sessionId: string,
+    snapshot: GameSnapshot,
+    version: string,
+  ) => {
+    broadcast(sessionId, createStateDeltaEvent(sessionId, snapshot, version));
+  };
+
+  const publishStateFinal = (
+    sessionId: string,
+    snapshot: GameSnapshot,
+    version: string,
+  ) => {
+    const event = createStateFinalEvent(sessionId, snapshot, version);
+
+    if (!event) {
+      return;
+    }
+
+    broadcast(sessionId, event);
+  };
+
+  const publishSystemError = (sessionId: string, payload: ErrorDetail) => {
+    broadcast(sessionId, createSystemErrorEvent(sessionId, payload));
+  };
+
+  const publishEventLog = (sessionId: string, entry: EventLogEntry) => {
+    const event: SseEventPayload = {
+      id: entry.id,
+      event: 'event.log',
+      data: JSON.stringify(entry),
+    };
+
+    broadcast(sessionId, event, { remember: false });
+  };
+
+  const publishRuleHint = (
+    sessionId: string,
+    payload: { stateVersion: string; hint: RuleHint },
+  ) => {
+    broadcast(sessionId, createRuleHintEvent(sessionId, payload));
+  };
+
+  return {
+    connect,
+    publishStateDelta,
+    publishStateFinal,
+    publishSystemError,
+    publishEventLog,
+    publishRuleHint,
+  };
+};

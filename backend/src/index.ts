@@ -1,28 +1,25 @@
 import { serve } from '@hono/node-server';
-import { OpenAPIHono } from '@hono/zod-openapi';
-import { Scalar } from '@scalar/hono-api-reference';
-import { roomsIndexGet } from 'routes/rooms/index.get.js';
+import { hc } from 'hono/client';
+import { createApp } from './app.js';
 
-const app = new OpenAPIHono();
+const app = createApp();
 
-app.route('/', roomsIndexGet);
-
-app
-  .doc('/doc', {
-    openapi: '3.0.0',
-    info: {
-      version: '1.0.0',
-      title: 'My API',
+// @ts-expect-error: import.meta.main の型がまだない
+if (import.meta.main as boolean) {
+  serve(
+    {
+      fetch: app.fetch,
+      port: 5000,
     },
-  })
-  .get('/scalar', Scalar({ url: '/doc' }));
+    (info) => {
+      console.info(`Server is running on http://localhost:${info.port}`);
+    },
+  );
+}
 
-serve(
-  {
-    fetch: app.fetch,
-    port: 3000,
-  },
-  (info) => {
-    console.info(`Server is running on http://localhost:${info.port}`);
-  },
-);
+// this is a trick to calculate the type when compiling
+export type Client = ReturnType<typeof hc<typeof app>>;
+
+// eslint-disable-next-line jsdoc/require-jsdoc
+export const hcWithType = (...args: Parameters<typeof hc>): Client =>
+  hc<typeof app>(...args);

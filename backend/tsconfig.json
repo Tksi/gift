@@ -10,11 +10,11 @@
     "jsxImportSource": "hono/jsx",
     "baseUrl": "./src",
     "outDir": "./dist",
-    // Stricter Typechecking Options
+    // より厳密な型チェックのオプション
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
     "noImplicitAny": true,
-    // Style Options
+    // コードスタイル関連のオプション
     "noImplicitReturns": true,
     "noImplicitOverride": true,
     "noUnusedLocals": true,

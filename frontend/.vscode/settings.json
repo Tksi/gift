@@ -1,4 +1,5 @@
 {
+  "typescript.tsdk": "node_modules/typescript/lib",
   "editor.formatOnPaste": true,
   "editor.formatOnType": true,
   "editor.formatOnSave": true,
@@ -65,7 +66,7 @@
   },
   "conventionalCommits.gitmoji": false,
   "conventionalCommits.promptScopes": true,
-  "conventionalCommits.scopes": ["frontend", "backend"],
+  "conventionalCommits.scopes": ["frontend"],
   "conventionalCommits.promptFooter": false,
   "conventionalCommits.promptBody": false,
   "git.openRepositoryInParentFolders": "always"
