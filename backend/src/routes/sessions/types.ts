@@ -31,7 +31,7 @@ export type SessionEnv = {
 
 /**
  * 依存注入ミドルウェアを生成するファクトリ。
- * createRoute の middleware プロパティで使用する。
+ * app.use() で使用する。
  * @param deps セッションルートに必要な依存オブジェクト。
  */
 export const createSessionDepsMiddleware = (deps: SessionRouteDependencies) =>

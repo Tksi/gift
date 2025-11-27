@@ -1,52 +1,45 @@
-import { createRoute, z } from '@hono/zod-openapi';
+import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
 import { streamSSE } from 'hono/streaming';
 import { respondNotFound } from 'routes/sessions/shared.js';
-import {
-  type SessionRouteDependencies,
-  createSessionDepsMiddleware,
-} from 'routes/sessions/types.js';
 import { errorResponseSchema } from 'schema/sessions.js';
-import type { OpenAPIHono } from '@hono/zod-openapi';
+import type { SessionEnv } from 'routes/sessions/types.js';
 import type { SseEventPayload } from 'services/sseBroadcastGateway.js';
 
 const KEEP_ALIVE_INTERVAL_MS = 15_000;
 
 /**
- * 依存注入ミドルウェア付きのルート定義を生成する。
- * @param deps セッションルートに必要な依存オブジェクト。
+ * SSE ストリーム GET ルートの静的定義。
  */
-const createSessionStreamRoute = (deps: SessionRouteDependencies) =>
-  createRoute({
-    method: 'get',
-    path: '/sessions/{sessionId}/stream',
-    middleware: [createSessionDepsMiddleware(deps)] as const,
-    description:
-      '指定したセッションの状態更新を SSE (Server-Sent Events) で購読します。`Last-Event-ID` を送ると未取得イベントを再送します。',
-    request: {
-      params: z.object({
-        sessionId: z
-          .string()
-          .min(1)
-          .describe(
-            'SSE で監視する `session_id`。プレイヤー登録レスポンスで受け取った値を指定します。',
-          ),
-      }),
+export const sessionStreamGetRoute = createRoute({
+  method: 'get',
+  path: '/sessions/{sessionId}/stream',
+  description:
+    '指定したセッションの状態更新を SSE (Server-Sent Events) で購読します。`Last-Event-ID` を送ると未取得イベントを再送します。',
+  request: {
+    params: z.object({
+      sessionId: z
+        .string()
+        .min(1)
+        .describe(
+          'SSE で監視する `session_id`。プレイヤー登録レスポンスで受け取った値を指定します。',
+        ),
+    }),
+  },
+  responses: {
+    200: {
+      description:
+        'SSE ストリームが確立され、`state.delta` や `state.final` などのイベントが配信されます。',
     },
-    responses: {
-      200: {
-        description:
-          'SSE ストリームが確立され、`state.delta` や `state.final` などのイベントが配信されます。',
-      },
-      404: {
-        description: 'セッションが見つかりません。',
-        content: {
-          'application/json': {
-            schema: errorResponseSchema,
-          },
+    404: {
+      description: 'セッションが見つかりません。',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
         },
       },
     },
-  });
+  },
+});
 
 const formatPayload = (event: SseEventPayload) => ({
   id: event.id,
@@ -55,17 +48,11 @@ const formatPayload = (event: SseEventPayload) => ({
 });
 
 /**
- * SSE ストリーム GET ルートを登録する。
- * @param app OpenAPIHono インスタンス。
- * @param dependencies セッションストアとゲートウェイ。
+ * SSE ストリーム GET ルートを持つ Hono アプリケーション。
  */
-export const registerSessionStreamGetRoute = (
-  app: OpenAPIHono,
-  dependencies: SessionRouteDependencies,
-) => {
-  const route = createSessionStreamRoute(dependencies);
-
-  app.openapi(route, (c) => {
+export const sessionStreamGetApp = new OpenAPIHono<SessionEnv>().openapi(
+  sessionStreamGetRoute,
+  (c) => {
     const deps = c.var.deps;
     const { sessionId } = c.req.valid('param');
     const envelope = deps.store.getEnvelope(sessionId);
@@ -150,5 +137,5 @@ export const registerSessionStreamGetRoute = (
         await stream.write(': error\n\n');
       },
     );
-  });
-};
+  },
+);

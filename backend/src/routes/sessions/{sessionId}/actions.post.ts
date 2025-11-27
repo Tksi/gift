@@ -1,8 +1,4 @@
-import { createRoute, z } from '@hono/zod-openapi';
-import {
-  type SessionRouteDependencies,
-  createSessionDepsMiddleware,
-} from 'routes/sessions/types.js';
+import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
 import {
   errorResponseSchema,
   sessionActionBodySchema,
@@ -10,79 +6,77 @@ import {
 } from 'schema/sessions.js';
 import { type ServiceError, createErrorResponseBody } from 'services/errors.js';
 import { publishStateEvents } from 'services/ssePublisher.js';
-import type { OpenAPIHono } from '@hono/zod-openapi';
+import type { SessionEnv } from 'routes/sessions/types.js';
 import type { GameSnapshot } from 'states/inMemoryGameStore.js';
 
 /**
- * 依存注入ミドルウェア付きのルート定義を生成する。
- * @param deps セッションルートに必要な依存オブジェクト。
+ * プレイヤーアクション POST ルートのハンドラ。
+ * @param c Hono コンテキスト。
  */
-const createPostSessionActionRoute = (deps: SessionRouteDependencies) =>
-  createRoute({
-    method: 'post',
-    path: '/sessions/{sessionId}/actions',
-    middleware: [createSessionDepsMiddleware(deps)] as const,
-    description:
-      '手番プレイヤーまたはシステムからのアクションコマンドを TurnDecisionService へ転送し、最新スナップショットと要約情報を返します。',
-    request: {
-      params: z.object({
-        sessionId: z
-          .string()
-          .min(1)
-          .describe('アクションを送信する対象の `session_id`。'),
-      }),
-      body: {
-        required: true,
-        content: {
-          'application/json': {
-            schema: sessionActionBodySchema,
-            example: {
-              command_id: 'cmd-123',
-              state_version: 'etag-hex',
-              player_id: 'alice',
-              action: 'placeChip',
-            },
+export const sessionActionsPostRoute = createRoute({
+  method: 'post',
+  path: '/sessions/{sessionId}/actions',
+  description:
+    '手番プレイヤーまたはシステムからのアクションコマンドを TurnDecisionService へ転送し、最新スナップショットと要約情報を返します。',
+  request: {
+    params: z.object({
+      sessionId: z
+        .string()
+        .min(1)
+        .describe('アクションを送信する対象の `session_id`。'),
+    }),
+    body: {
+      required: true,
+      content: {
+        'application/json': {
+          schema: sessionActionBodySchema,
+          example: {
+            command_id: 'cmd-123',
+            state_version: 'etag-hex',
+            player_id: 'alice',
+            action: 'placeChip',
           },
         },
       },
     },
-    responses: {
-      200: {
-        description:
-          'アクションが適用され、新しい状態とターン要約が返却されました。',
-        content: {
-          'application/json': {
-            schema: sessionActionResponseSchema,
-          },
-        },
-      },
-      404: {
-        description: 'セッションまたはプレイヤーが存在しません。',
-        content: {
-          'application/json': {
-            schema: errorResponseSchema,
-          },
-        },
-      },
-      409: {
-        description:
-          '`state_version` が最新と一致しない、または完了済みゲームなどのため競合しました。',
-        content: {
-          'application/json': {
-            schema: errorResponseSchema,
-          },
-        },
-      },
-      422: {
-        description: '入力やチップ残量などの検証に失敗しました。',
-        content: {
-          'application/json': {
-            schema: errorResponseSchema,
-          },
+  },
+  responses: {
+    200: {
+      description:
+        'アクションが適用され、新しい状態とターン要約が返却されました。',
+      content: {
+        'application/json': {
+          schema: sessionActionResponseSchema,
         },
       },
     },
-  });
+    404: {
+      description: 'セッションまたはプレイヤーが存在しません。',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
+        },
+      },
+    },
+    409: {
+      description:
+        '`state_version` が最新と一致しない、または完了済みゲームなどのため競合しました。',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
+        },
+      },
+    },
+    422: {
+      description: '入力やチップ残量などの検証に失敗しました。',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
+        },
+      },
+    },
+  },
+});
 
 const createTurnContext = (snapshot: GameSnapshot) => ({
   turn: snapshot.turnState.turn,
@@ -109,17 +103,11 @@ const isServiceError = (err: unknown): err is ServiceError =>
   typeof (err as ServiceError).status === 'number';
 
 /**
- * プレイヤーアクション POST ルートを登録する。
- * @param app OpenAPIHono インスタンス。
- * @param dependencies セッションストアやサービス群。
+ * プレイヤーアクション POST ルートを持つ Hono アプリケーション。
  */
-export const registerSessionActionsPostRoute = (
-  app: OpenAPIHono,
-  dependencies: SessionRouteDependencies,
-) => {
-  const route = createPostSessionActionRoute(dependencies);
-
-  app.openapi(route, async (c) => {
+export const sessionActionsPostApp = new OpenAPIHono<SessionEnv>().openapi(
+  sessionActionsPostRoute,
+  async (c) => {
     const deps = c.var.deps;
     const { sessionId } = c.req.valid('param');
     const payload = c.req.valid('json');
@@ -162,5 +150,5 @@ export const registerSessionActionsPostRoute = (
 
       throw err;
     }
-  });
-};
+  },
+);

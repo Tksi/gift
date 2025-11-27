@@ -1,12 +1,8 @@
-import { createRoute } from '@hono/zod-openapi';
+import { OpenAPIHono, createRoute } from '@hono/zod-openapi';
 import {
   respondValidationError,
   toSessionResponse,
 } from 'routes/sessions/shared.js';
-import {
-  type SessionRouteDependencies,
-  createSessionDepsMiddleware,
-} from 'routes/sessions/types.js';
 import {
   createSessionBodySchema,
   errorResponseSchema,
@@ -15,7 +11,7 @@ import {
 import { publishStateEvents } from 'services/ssePublisher.js';
 import { calculateTurnDeadline } from 'services/timerSupervisor.js';
 import { createSetupSnapshot } from 'states/setup.js';
-import type { OpenAPIHono } from '@hono/zod-openapi';
+import type { SessionEnv } from 'routes/sessions/types.js';
 import type { PlayerRegistration } from 'schema/players.js';
 import type { GameSnapshot, PlayerSummary } from 'states/inMemoryGameStore.js';
 
@@ -24,55 +20,52 @@ const MAX_PLAYERS = 7;
 const INITIAL_PLAYER_CHIPS = 11;
 
 /**
- * 依存注入ミドルウェア付きのルート定義を生成する。
- * @param deps セッションルートに必要な依存オブジェクト。
+ * セッション作成 POST ルートの静的定義。
  */
-const createSessionRouteWithMiddleware = (deps: SessionRouteDependencies) =>
-  createRoute({
-    method: 'post',
-    path: '/sessions',
-    description:
-      '指定されたプレイヤー情報と任意のシード値を用いてゲームのセットアップを実行し、初期スナップショットと状態バージョンを返します。',
-    middleware: [createSessionDepsMiddleware(deps)] as const,
-    request: {
-      body: {
-        required: true,
-        content: {
-          'application/json': {
-            schema: createSessionBodySchema,
-            example: {
-              seed: 'optional-seed-string',
-              players: [
-                { id: 'alice', display_name: 'Alice' },
-                { id: 'bob', display_name: 'Bob' },
-              ],
-            },
+export const sessionPostRoute = createRoute({
+  method: 'post',
+  path: '/sessions',
+  description:
+    '指定されたプレイヤー情報と任意のシード値を用いてゲームのセットアップを実行し、初期スナップショットと状態バージョンを返します。',
+  request: {
+    body: {
+      required: true,
+      content: {
+        'application/json': {
+          schema: createSessionBodySchema,
+          example: {
+            seed: 'optional-seed-string',
+            players: [
+              { id: 'alice', display_name: 'Alice' },
+              { id: 'bob', display_name: 'Bob' },
+            ],
           },
         },
-        description:
-          'プレイヤー ID と表示名、そして任意の乱数シード。ID は 2〜7 名、英数 + `_`/`-` のみ許可されます。',
       },
+      description:
+        'プレイヤー ID と表示名、そして任意の乱数シード。ID は 2〜7 名、英数 + `_`/`-` のみ許可されます。',
     },
-    responses: {
-      201: {
-        description: '新しいセッションが作成され、初期状態が返却されました。',
-        content: {
-          'application/json': {
-            schema: sessionResponseSchema,
-          },
-        },
-      },
-      422: {
-        description:
-          '入力検証に失敗しました。プレイヤー人数や ID の重複などを `error.code` で示します。',
-        content: {
-          'application/json': {
-            schema: errorResponseSchema,
-          },
+  },
+  responses: {
+    201: {
+      description: '新しいセッションが作成され、初期状態が返却されました。',
+      content: {
+        'application/json': {
+          schema: sessionResponseSchema,
         },
       },
     },
-  });
+    422: {
+      description:
+        '入力検証に失敗しました。プレイヤー人数や ID の重複などを `error.code` で示します。',
+      content: {
+        'application/json': {
+          schema: errorResponseSchema,
+        },
+      },
+    },
+  },
+});
 
 type NormalizedPlayer = PlayerSummary;
 
@@ -187,17 +180,11 @@ const createInitialSnapshot = (
 };
 
 /**
- * セッション作成 POST ルートをアプリケーションへ登録する。
- * @param app OpenAPIHono インスタンス。
- * @param dependencies ストアや時刻生成などの依存オブジェクト。
+ * セッション作成 POST ルートを持つ Hono アプリケーション。
  */
-export const registerSessionPostRoute = (
-  app: OpenAPIHono,
-  dependencies: SessionRouteDependencies,
-) => {
-  const route = createSessionRouteWithMiddleware(dependencies);
-
-  app.openapi(route, (c) => {
+export const sessionPostApp = new OpenAPIHono<SessionEnv>().openapi(
+  sessionPostRoute,
+  (c) => {
     const deps = c.var.deps;
     const payload = c.req.valid('json');
     const check = ensurePlayerConstraints(payload.players);
@@ -247,5 +234,5 @@ export const registerSessionPostRoute = (
     }
 
     return respondValidationError(c, check.code, check.message);
-  });
-};
+  },
+);
