@@ -66,7 +66,7 @@ const retrySubmit = (): void => {
     <div class="max-w-md mx-auto">
       <!-- ヘッダー -->
       <div class="mb-8 text-center">
-        <h1 class="font-bold text-3xl text-gray-900">No Thanks!</h1>
+        <h1 class="font-bold text-3xl text-gray-900">Gift</h1>
         <p class="mt-2 text-gray-600">新しいルームを作成</p>
       </div>
 
