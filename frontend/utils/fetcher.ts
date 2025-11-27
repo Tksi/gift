@@ -1,3 +1,3 @@
 import { hcWithType } from '@hc/index';
 
-export const fetcher = hcWithType('http://localhost:3000');
+export const fetcher = hcWithType(useRuntimeConfig().public.apiBase);
