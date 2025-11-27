@@ -150,7 +150,7 @@ sequenceDiagram
 |-----------|--------------|--------|--------------|------------------|-----------|
 | CreateSessionPage | Pages | セッション作成画面 | 1.1-1.6 | fetcher (P0) | - |
 | GamePage | Pages | ゲーム画面 | 2-6 | fetcher (P0), useSSE (P0) | - |
-| SessionForm | Components | プレイヤー入力フォーム | 1.1-1.4 | - | Props, Events |
+| SessionForm | Components | ルーム作成フォーム | 1.1-1.4 | - | Props, Events |
 | GameBoard | Components | 中央ゲーム盤面 | 2.2-2.5 | - | Props |
 | PlayerPanel | Components | プレイヤー情報パネル | 2.3, 2.4 | - | Props |
 | ActionPanel | Components | アクションボタン | 4.1-4.7 | - | Props, Events |
@@ -236,7 +236,7 @@ interface BaseUIPanelProps {
 
 | Field | Detail |
 |-------|--------|
-| Intent | プレイヤー情報入力フォームを提供する |
+| Intent | ルーム作成フォームを提供する（最大プレイヤー人数を選択） |
 | Requirements | 1.1, 1.3, 1.4 |
 
 **Contracts**: Props [x] / Events [x]
@@ -248,14 +248,15 @@ interface SessionFormProps extends BaseUIPanelProps {
 }
 
 interface SessionFormEmits {
-  /** フォーム送信イベント */
-  (e: 'submit', players: PlayerInput[]): void;
+  /** フォーム送信イベント（最大プレイヤー人数を送出） */
+  (e: 'submit', maxPlayers: number): void;
 }
 ```
 
 **Implementation Notes**
-- Validation: プレイヤー数 2〜7、ID 重複チェック
-- Risks: 大量プレイヤー入力時の UX → 最大 7 人制限を UI で明示
+- Validation: プレイヤー人数は 2〜7 の範囲で選択
+- UI: プレイヤー人数選択ボタン（2〜7 人）、デフォルト 3 人
+- Risks: なし（シンプルな人数選択のみ）
 
 ---
 
