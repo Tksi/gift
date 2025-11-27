@@ -11,6 +11,9 @@ import type { GameSnapshot } from 'states/inMemoryGameStore.js';
 const MIN_PLAYERS = 2;
 const MAX_PLAYERS = 7;
 
+/** 古いセッションを削除する閾値（ミリ秒）: 1日 */
+const SESSION_EXPIRY_MS = 24 * 60 * 60 * 1000;
+
 /**
  * セッション作成 POST ルートの静的定義。
  */
@@ -111,6 +114,10 @@ export const sessionPostApp = new OpenAPIHono<SessionEnv>().openapi(
         `Player count must be between ${MIN_PLAYERS} and ${MAX_PLAYERS}.`,
       );
     }
+
+    // 古いセッションをクリーンアップ（メモリリーク防止）
+    const expiryThreshold = new Date(Date.now() - SESSION_EXPIRY_MS);
+    deps.store.pruneSessionsOlderThan(expiryThreshold);
 
     const sessionId = deps.generateSessionId();
     const timestamp = deps.now();

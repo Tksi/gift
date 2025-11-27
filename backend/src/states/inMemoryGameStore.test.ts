@@ -137,4 +137,83 @@ describe('createInMemoryGameStore の挙動', () => {
       store.appendEventLog('missing-session', [makeLogEntry()]),
     ).toThrowError('Session missing-session is not initialized');
   });
+
+  describe('pruneSessionsOlderThan', () => {
+    it('指定日時より古いセッションを削除する', () => {
+      const store = createInMemoryGameStore();
+
+      // 2日前のセッション
+      const oldSession = makeSnapshot({
+        sessionId: 'old-session',
+        updatedAt: '2025-01-01T00:00:00.000Z',
+      });
+      // 現在のセッション
+      const newSession = makeSnapshot({
+        sessionId: 'new-session',
+        updatedAt: '2025-01-03T00:00:00.000Z',
+      });
+
+      store.saveSnapshot(oldSession);
+      store.saveSnapshot(newSession);
+
+      // 1月2日を閾値とする（1月1日のセッションは削除される）
+      const threshold = new Date('2025-01-02T00:00:00.000Z');
+      const pruned = store.pruneSessionsOlderThan(threshold);
+
+      expect(pruned).toEqual(['old-session']);
+      expect(store.getSnapshot('old-session')).toBeUndefined();
+      expect(store.getSnapshot('new-session')).toBeDefined();
+    });
+
+    it('削除対象がない場合は空配列を返す', () => {
+      const store = createInMemoryGameStore();
+
+      const recentSession = makeSnapshot({
+        sessionId: 'recent-session',
+        updatedAt: '2025-01-03T00:00:00.000Z',
+      });
+      store.saveSnapshot(recentSession);
+
+      const threshold = new Date('2025-01-02T00:00:00.000Z');
+      const pruned = store.pruneSessionsOlderThan(threshold);
+
+      expect(pruned).toEqual([]);
+      expect(store.getSnapshot('recent-session')).toBeDefined();
+    });
+
+    it('セッションがない場合は空配列を返す', () => {
+      const store = createInMemoryGameStore();
+
+      const threshold = new Date('2025-01-02T00:00:00.000Z');
+      const pruned = store.pruneSessionsOlderThan(threshold);
+
+      expect(pruned).toEqual([]);
+    });
+
+    it('削除時にlistSessionsからも消える', () => {
+      const store = createInMemoryGameStore();
+
+      store.saveSnapshot(
+        makeSnapshot({
+          sessionId: 'session-a',
+          updatedAt: '2025-01-01T00:00:00.000Z',
+        }),
+      );
+      store.saveSnapshot(
+        makeSnapshot({
+          sessionId: 'session-b',
+          updatedAt: '2025-01-03T00:00:00.000Z',
+        }),
+      );
+
+      expect(store.listSessions()).toHaveLength(2);
+
+      const threshold = new Date('2025-01-02T00:00:00.000Z');
+      store.pruneSessionsOlderThan(threshold);
+
+      const sessions = store.listSessions();
+      expect(sessions).toHaveLength(1);
+      expect(sessions[0]?.sessionId).toBe('session-b');
+    });
+  });
 });

@@ -127,4 +127,70 @@ describe('POST /sessions', () => {
     // Zodスキーマでmax(7)が設定されているため400が返る
     expect(response.status).toBe(400);
   });
+
+  it('セッション作成時に1日以上前のセッションを削除する', async () => {
+    const store = createInMemoryGameStore();
+    const timerSupervisor: TimerSupervisor = {
+      register: vi.fn(),
+      clear: vi.fn(),
+      restore: vi.fn(),
+    };
+
+    // 2日前の日時
+    const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+
+    // 古いセッションを作成
+    store.saveSnapshot({
+      sessionId: 'old-session',
+      phase: 'waiting',
+      deck: [],
+      discardHidden: [],
+      playerOrder: [],
+      rngSeed: '',
+      players: [],
+      chips: {},
+      hands: {},
+      centralPot: 0,
+      turnState: {
+        turn: 0,
+        currentPlayerId: '',
+        currentPlayerIndex: 0,
+        cardInCenter: null,
+        awaitingAction: false,
+        deadline: null,
+      },
+      createdAt: twoDaysAgo.toISOString(),
+      updatedAt: twoDaysAgo.toISOString(),
+      finalResults: null,
+      maxPlayers: 3,
+    });
+
+    expect(store.getSnapshot('old-session')).toBeDefined();
+
+    const app = createApp({
+      store,
+      now: () => new Date().toISOString(),
+      generateSessionId: () => 'new-session',
+      timerSupervisor,
+      turnTimeoutMs: 30_000,
+    });
+
+    // 新しいセッションを作成
+    const response = await app.request('/sessions', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        max_players: 3,
+      }),
+    });
+
+    expect(response.status).toBe(201);
+
+    // 古いセッションが削除されている
+    expect(store.getSnapshot('old-session')).toBeUndefined();
+    // 新しいセッションは存在する
+    expect(store.getSnapshot('new-session')).toBeDefined();
+  });
 });

@@ -63,6 +63,12 @@ export type InMemoryGameStore = {
   hasProcessedCommand: (sessionId: string, commandId: string) => boolean;
   markCommandProcessed: (sessionId: string, commandId: string) => void;
   listSessions: () => SessionSummary[];
+  /**
+   * 指定した日時より前に更新されたセッションを削除する。
+   * @param olderThan この日時より前のセッションを削除。
+   * @returns 削除されたセッションIDのリスト。
+   */
+  pruneSessionsOlderThan: (olderThan: Date) => string[];
 };
 
 const cloneValue = <T>(value: T): T => structuredClone(value);
@@ -203,6 +209,27 @@ export const createInMemoryGameStore = (): InMemoryGameStore => {
       updatedAt: envelope.snapshot.updatedAt,
     }));
 
+  const pruneSessionsOlderThan = (olderThan: Date): string[] => {
+    const threshold = olderThan.getTime();
+    const prunedIds: string[] = [];
+
+    for (const [sessionId, envelope] of sessions) {
+      const updatedAt = new Date(envelope.snapshot.updatedAt).getTime();
+
+      if (updatedAt < threshold) {
+        // タイマーがあればクリアする
+        if (envelope.deadlineHandle) {
+          clearTimeout(envelope.deadlineHandle);
+        }
+
+        sessions.delete(sessionId);
+        prunedIds.push(sessionId);
+      }
+    }
+
+    return prunedIds;
+  };
+
   return {
     saveSnapshot,
     getSnapshot,
@@ -212,5 +239,6 @@ export const createInMemoryGameStore = (): InMemoryGameStore => {
     hasProcessedCommand,
     markCommandProcessed,
     listSessions,
+    pruneSessionsOlderThan,
   };
 };
