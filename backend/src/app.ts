@@ -160,3 +160,6 @@ export const createApp = (options: CreateAppOptions = {}) => {
 
   return routes;
 };
+
+// hc クライアント生成のための型エクスポート
+export type AppType = ReturnType<typeof createApp>;
