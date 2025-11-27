@@ -5,7 +5,7 @@ export default defineNuxtConfig({
   devtools: { enabled: false },
   ssr: false,
   alias: {
-    '@backend': '../backend/dist',
+    '@hc': '../hc',
   },
   runtimeConfig: {
     public: {
