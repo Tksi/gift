@@ -58,16 +58,19 @@ const createSnapshot = (
 };
 
 describe('calculateScoreSummary', () => {
-  it('連番セットの最小値のみを合算し順位を付与する', () => {
+  it('チップからカード合計を引いた値でスコアを算出し順位を付与する', () => {
     const snapshot = createSnapshot();
 
     const summary = calculateScoreSummary(snapshot);
 
+    // alice: 5 - (3+4+7) = 5 - 14 = -9
+    // bob: 4 - (9+10+11) = 4 - 30 = -26
+    // carl: 8 - 0 = 8
     expect(summary.placements).toEqual([
       {
         rank: 1,
         playerId: 'carl',
-        score: -8,
+        score: 8,
         chipsRemaining: 8,
         cards: [],
         cardSets: [],
@@ -75,7 +78,7 @@ describe('calculateScoreSummary', () => {
       {
         rank: 2,
         playerId: 'alice',
-        score: 5,
+        score: -9,
         chipsRemaining: 5,
         cards: [3, 4, 7],
         cardSets: [[3, 4], [7]],
@@ -83,18 +86,13 @@ describe('calculateScoreSummary', () => {
       {
         rank: 3,
         playerId: 'bob',
-        score: 5,
+        score: -26,
         chipsRemaining: 4,
         cards: [9, 10, 11],
         cardSets: [[9, 10, 11]],
       },
     ]);
-    expect(summary.tieBreak).toEqual({
-      reason: 'chipCount',
-      tiedScore: 5,
-      contenders: ['alice', 'bob'],
-      winner: 'alice',
-    });
+    expect(summary.tieBreak).toBeNull();
   });
 
   it('最終スコアが同点の場合は余剰チップの多いプレイヤーを勝者にする', () => {
@@ -113,26 +111,24 @@ describe('calculateScoreSummary', () => {
 
     const summary = calculateScoreSummary(snapshot);
 
+    // alice: 3 - (5+6) = 3 - 11 = -8
+    // bob: 6 - (8+9+10) = 6 - 27 = -21
+    // carl: 0 - 30 = -30
     expect(summary.placements.map((item) => item.playerId)).toEqual([
-      'bob',
       'alice',
+      'bob',
       'carl',
     ]);
     expect(summary.placements[0]).toMatchObject({
-      playerId: 'bob',
-      score: 8 - 6,
-      chipsRemaining: 6,
+      playerId: 'alice',
+      score: 3 - 11,
+      chipsRemaining: 3,
     });
     expect(summary.placements[1]).toMatchObject({
-      playerId: 'alice',
-      score: 5 - 3,
+      playerId: 'bob',
+      score: 6 - 27,
     });
-    expect(summary.tieBreak).toEqual({
-      reason: 'chipCount',
-      tiedScore: 2,
-      contenders: ['alice', 'bob'],
-      winner: 'bob',
-    });
+    expect(summary.tieBreak).toBeNull();
   });
 
   it('複数の連番グループを正しく判定する', () => {
@@ -155,7 +151,8 @@ describe('calculateScoreSummary', () => {
     );
 
     expect(alicePlacement?.cardSets).toEqual([[3, 4, 5], [10, 11], [20]]);
-    expect(alicePlacement?.score).toBe(3 + 10 + 20 - 2);
+    // alice: 2 - (3+4+5+10+11+20) = 2 - 53 = -51
+    expect(alicePlacement?.score).toBe(2 - (3 + 4 + 5 + 10 + 11 + 20));
   });
 
   it('同点かつチップ数も同じ場合は winner が null になる', () => {
@@ -178,10 +175,13 @@ describe('calculateScoreSummary', () => {
       score: item.score,
     }));
 
+    // alice: 0 - 10 = -10
+    // bob: 0 - (7+8+9) = -24
+    // carl: 0 - 0 = 0
     expect(scores).toEqual([
       { id: 'carl', score: 0 },
-      { id: 'bob', score: 7 },
-      { id: 'alice', score: 10 },
+      { id: 'alice', score: -10 },
+      { id: 'bob', score: -24 },
     ]);
     expect(summary.tieBreak).toBeNull();
   });
@@ -202,8 +202,9 @@ describe('calculateScoreSummary', () => {
 
     const summary = calculateScoreSummary(snapshot);
 
-    expect(summary.placements.map((item) => item.score)).toEqual([5, 5, 5]);
-    expect(summary.tieBreak?.tiedScore).toBe(5);
+    // 全員: 5 - 10 = -5
+    expect(summary.placements.map((item) => item.score)).toEqual([-5, -5, -5]);
+    expect(summary.tieBreak?.tiedScore).toBe(-5);
     expect(summary.tieBreak?.contenders).toEqual(['alice', 'bob', 'carl']);
     expect(summary.tieBreak?.winner).toBeNull();
   });
@@ -224,7 +225,13 @@ describe('calculateScoreSummary', () => {
 
     const summary = calculateScoreSummary(snapshot);
 
-    expect(summary.placements.map((item) => item.score)).toEqual([5, 10, 20]);
+    // alice: 0 - 5 = -5
+    // bob: 0 - 10 = -10
+    // carl: 0 - 20 = -20
+    // 降順ソート: alice > bob > carl
+    expect(summary.placements.map((item) => item.score)).toEqual([
+      -5, -10, -20,
+    ]);
     expect(summary.tieBreak).toBeNull();
   });
 });

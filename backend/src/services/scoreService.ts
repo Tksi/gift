@@ -40,8 +40,8 @@ const createPlacement = (
   chips: number,
 ): Omit<ScorePlacement, 'rank'> => {
   const sets = createCardSets(cards);
-  const cardSetScore = sets.reduce((sum, set) => sum + (set[0] ?? 0), 0);
-  const score = cardSetScore - chips;
+  const totalCards = cards.reduce((sum, card) => sum + card, 0);
+  const score = chips - totalCards;
 
   return {
     playerId,
@@ -59,7 +59,7 @@ const sortPlacements = (
     .map((placement) => ({ ...placement, rank: 0 }))
     .toSorted((a, b) => {
       if (a.score !== b.score) {
-        return a.score - b.score;
+        return b.score - a.score;
       }
 
       if (a.chipsRemaining !== b.chipsRemaining) {

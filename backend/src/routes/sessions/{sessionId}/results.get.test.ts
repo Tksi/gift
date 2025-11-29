@@ -10,12 +10,14 @@ const createTestApp = () => {
   return { app, store };
 };
 
+// 新スコア計算: チップ - 獲得カードの合計（高いほうが勝ち）
+// alice: 8 - (3+4) = 1, bob: 5 - 10 = -5
 const sampleResults: ScoreSummary = {
   placements: [
     {
       rank: 1,
       playerId: 'alice',
-      score: -3,
+      score: 1,
       chipsRemaining: 8,
       cards: [3, 4],
       cardSets: [[3, 4]],
@@ -23,7 +25,7 @@ const sampleResults: ScoreSummary = {
     {
       rank: 2,
       playerId: 'bob',
-      score: 5,
+      score: -5,
       chipsRemaining: 5,
       cards: [10],
       cardSets: [[10]],
