@@ -68,15 +68,32 @@ const turnHighlightClass = computed((): string => {
 
 <template>
   <div
-    class="border border-gray-200 p-4 rounded-lg shadow-sm"
+    class="border border-gray-200 p-3 rounded-lg shadow-sm"
     :class="[backgroundClass, turnHighlightClass]"
     data-testid="player-panel"
   >
-    <!-- プレイヤー名 -->
-    <div class="flex items-center justify-between mb-3">
-      <span class="font-semibold text-gray-800">
-        {{ player.displayName }}
-      </span>
+    <!-- プレイヤー名・チップ・手番バッジ -->
+    <div class="flex items-center justify-between mb-2">
+      <div class="flex gap-2 items-center">
+        <span class="font-semibold text-gray-800">
+          {{ player.displayName }}
+        </span>
+        <!-- チップ数 -->
+        <div
+          class="flex gap-1 items-center text-gray-600"
+          data-testid="player-chips"
+        >
+          <svg
+            class="size-3.5 text-yellow-500"
+            fill="currentColor"
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <circle cx="12" cy="12" r="10" />
+          </svg>
+          <span class="font-medium text-sm">{{ chips }}</span>
+        </div>
+      </div>
       <span
         v-if="isCurrentTurn"
         class="bg-blue-100 font-medium px-2 py-0.5 rounded text-blue-700 text-xs"
@@ -85,32 +102,14 @@ const turnHighlightClass = computed((): string => {
       </span>
     </div>
 
-    <!-- チップ数 -->
-    <div
-      class="flex gap-1.5 items-center mb-3 text-gray-600"
-      data-testid="player-chips"
-    >
-      <svg
-        class="size-4 text-yellow-500"
-        fill="currentColor"
-        viewBox="0 0 24 24"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <circle cx="12" cy="12" r="10" />
-      </svg>
-      <span class="font-medium">{{ chips }}</span>
-      <span class="text-sm">チップ</span>
-    </div>
-
     <!-- 獲得済みカード -->
     <div data-testid="player-cards">
-      <div class="mb-1 text-gray-500 text-xs">獲得カード</div>
       <!-- カードがある場合 -->
-      <div v-if="cardSets.length > 0" class="flex flex-wrap gap-1.5">
+      <div v-if="cardSets.length > 0" class="flex flex-wrap gap-1">
         <div
           v-for="(set, index) in cardSets"
           :key="index"
-          class="bg-amber-100 inline-flex px-2 py-1 rounded text-amber-800 text-sm"
+          class="bg-amber-100 inline-flex px-1.5 py-0.5 rounded text-amber-800 text-xs"
           data-testid="card-set"
         >
           <span v-if="set.length === 1">{{ set[0] }}</span>
@@ -118,8 +117,8 @@ const turnHighlightClass = computed((): string => {
         </div>
       </div>
       <!-- カードがない場合 -->
-      <div v-else class="text-gray-400 text-sm" data-testid="no-cards">
-        なし
+      <div v-else class="text-gray-400 text-xs" data-testid="no-cards">
+        カードなし
       </div>
     </div>
   </div>

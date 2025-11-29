@@ -674,13 +674,16 @@ watch(sessionId, (newSessionId, oldSessionId) => {
         <!-- アクションパネル（参加者のみ表示） -->
         <ActionPanel
           v-if="!isSpectator"
-          class="mt-6"
+          class="bottom-0 fixed left-0 lg:mt-6 lg:relative lg:rounded-lg right-0 rounded-none z-10"
           :is-my-turn="isMyTurn"
           :is-submitting="isActionSubmitting"
           :my-chips="myChips"
           @place-chip="() => handlePlaceChip()"
           @take-card="() => handleTakeCard()"
         />
+
+        <!-- アクションパネル分のスペーサー（スマホ時のみ） -->
+        <div v-if="!isSpectator" class="h-28 lg:hidden" />
 
         <!-- ヒントパネル -->
         <HintPanel

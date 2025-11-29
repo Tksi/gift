@@ -45,7 +45,9 @@ const handleTakeCard = (): void => {
 </script>
 
 <template>
-  <div class="bg-white border border-gray-200 p-4 rounded-lg shadow-sm">
+  <div
+    class="bg-white border border-gray-200 border-t lg:border lg:shadow-sm p-4 shadow-[0_-2px_10px_rgba(0,0,0,0.1)] shadow-sm"
+  >
     <!-- アクションボタン -->
     <div class="flex gap-3">
       <!-- チップを置くボタン -->
@@ -91,24 +93,6 @@ const handleTakeCard = (): void => {
           カードを取る
         </span>
       </button>
-    </div>
-
-    <!-- 手番外のメッセージ -->
-    <div
-      v-if="!isMyTurn"
-      class="mt-3 text-center text-gray-500 text-sm"
-      data-testid="not-your-turn-message"
-    >
-      他のプレイヤーの手番です
-    </div>
-
-    <!-- チップ不足の警告 -->
-    <div
-      v-if="isMyTurn && myChips === 0"
-      class="bg-amber-50 border border-amber-200 mt-3 p-2 rounded text-amber-700 text-center text-sm"
-      data-testid="no-chips-warning"
-    >
-      チップがないため、カードを取る必要があります
     </div>
   </div>
 </template>

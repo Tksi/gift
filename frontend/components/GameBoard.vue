@@ -37,16 +37,16 @@ const borderColorClass = computed((): string => {
 
 <template>
   <div
-    class="bg-white border-2 flex flex-col gap-4 items-center justify-center p-6 rounded-xl shadow-md"
+    class="bg-white border-2 flex gap-4 items-center justify-center p-4 rounded-xl shadow-md"
     :class="[borderColorClass]"
     data-testid="game-board"
   >
     <!-- 中央カード表示 -->
-    <div class="flex flex-col gap-2 items-center">
+    <div class="flex flex-col items-center">
       <!-- カードがある場合 -->
       <div
         v-if="cardInCenter !== null"
-        class="bg-gradient-to-br flex font-bold from-amber-100 h-28 items-center justify-center rounded-lg shadow-inner text-4xl text-amber-800 to-amber-50 w-20"
+        class="bg-gradient-to-br flex font-bold from-amber-100 h-20 items-center justify-center rounded-lg shadow-inner text-3xl text-amber-800 to-amber-50 w-14"
         data-testid="center-card"
       >
         {{ cardInCenter }}
@@ -54,11 +54,11 @@ const borderColorClass = computed((): string => {
       <!-- カードがない場合（空の状態） -->
       <div
         v-else
-        class="bg-gray-100 border-2 border-dashed border-gray-300 flex h-28 items-center justify-center rounded-lg text-gray-400 w-20"
+        class="bg-gray-100 border-2 border-dashed border-gray-300 flex h-20 items-center justify-center rounded-lg text-gray-400 w-14"
         data-testid="empty-card"
       >
         <svg
-          class="size-8"
+          class="size-6"
           fill="none"
           stroke="currentColor"
           stroke-width="1.5"
@@ -76,19 +76,21 @@ const borderColorClass = computed((): string => {
 
     <!-- 中央ポット表示 -->
     <div
-      class="flex gap-1.5 items-center text-gray-600"
+      class="flex flex-col gap-0.5 items-center text-gray-600"
       data-testid="central-pot"
     >
-      <svg
-        class="size-5 text-yellow-500"
-        fill="currentColor"
-        viewBox="0 0 24 24"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <circle cx="12" cy="12" r="10" />
-      </svg>
-      <span class="font-semibold text-lg">{{ centralPot }}</span>
-      <span class="text-sm">チップ</span>
+      <div class="flex gap-1 items-center">
+        <svg
+          class="size-4 text-yellow-500"
+          fill="currentColor"
+          viewBox="0 0 24 24"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <circle cx="12" cy="12" r="10" />
+        </svg>
+        <span class="font-semibold text-lg">{{ centralPot }}</span>
+      </div>
+      <span class="text-gray-500 text-xs">チップ</span>
     </div>
   </div>
 </template>
