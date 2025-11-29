@@ -102,7 +102,7 @@ const retrySubmit = (): void => {
 
 /**
  * ルームに参加
- * @param sessionId
+ * @param sessionId - 参加するセッションのID
  */
 const joinRoom = (sessionId: string): void => {
   void navigateTo(`/sessions/${sessionId}`);

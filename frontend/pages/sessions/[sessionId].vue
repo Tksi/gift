@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import QrcodeVue from 'qrcode.vue';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import type { ApiError } from '~/types/apiError';
 import { type SseEvent, useSse } from '~/composables/useSse';
@@ -447,6 +448,15 @@ const isSpectator = computed((): boolean => {
   return !hasJoined.value;
 });
 
+/** 現在のURL（QRコード用） */
+const currentUrl = computed((): string => {
+  if (import.meta.client) {
+    return globalThis.location.href;
+  }
+
+  return '';
+});
+
 // マウント時に初期状態を取得
 onMounted(() => {
   void loadInitialState();
@@ -573,9 +583,19 @@ watch(sessionId, (newSessionId, oldSessionId) => {
           </div>
 
           <!-- URL 共有案内 -->
-          <p class="bg-gray-50 mb-4 p-3 rounded-lg text-gray-600 text-sm">
-            URLを共有して参加者を招待してください
-          </p>
+          <div class="bg-gray-50 mb-4 p-3 rounded-lg">
+            <p class="mb-3 text-center text-gray-600 text-sm">
+              URLを共有して参加者を招待してください
+            </p>
+            <!-- QRコード -->
+            <div
+              v-if="currentUrl"
+              class="flex justify-center"
+              data-testid="qr-code"
+            >
+              <QrcodeVue :size="160" :value="currentUrl" />
+            </div>
+          </div>
 
           <!-- ゲーム開始ボタン -->
           <button
