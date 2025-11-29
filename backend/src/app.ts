@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { Scalar } from '@scalar/hono-api-reference';
 import { cors } from 'hono/cors';
+import { sessionsListGetApp } from 'routes/sessions/index.get.js';
 import { sessionPostApp } from 'routes/sessions/index.post.js';
 import { createSessionDepsMiddleware } from 'routes/sessions/types.js';
 import { sessionActionsPostApp } from 'routes/sessions/{sessionId}/actions.post.js';
@@ -145,6 +146,7 @@ export const createApp = (options: CreateAppOptions = {}) => {
   // app.route() でサブアプリをマウントして型を保持
   const routes = app
     .route('/', sessionPostApp)
+    .route('/', sessionsListGetApp)
     .route('/', sessionGetApp)
     .route('/', sessionStateGetApp)
     .route('/', sessionHintGetApp)

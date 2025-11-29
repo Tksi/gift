@@ -4311,6 +4311,23 @@ declare const createApp: (options?: CreateAppOptions) => Hono$1<SessionEnv, Merg
   };
 }, "/"> & MergeSchemaPath<{
   "/sessions": {
+    $get: {
+      input: {};
+      output: {
+        sessions: {
+          sessionId: string;
+          playerCount: number;
+          maxPlayers: number;
+          phase: "waiting" | "setup" | "running" | "completed";
+          createdAt: string;
+        }[];
+      };
+      outputFormat: "json";
+      status: 200;
+    };
+  };
+}, "/"> & MergeSchemaPath<{
+  "/sessions": {
     $post: {
       input: {
         json: {

@@ -13,6 +13,9 @@ const errorMessages: Record<string, string> = {
   PLAYER_NOT_FOUND: '指定されたプレイヤーが見つかりません。',
   PLAYER_ORDER_INVALID: 'プレイヤー順序が不正です。',
   NETWORK_ERROR: 'ネットワーク接続を確認してください。',
+  SESSION_NOT_JOINABLE: 'このセッションは参加受付を終了しています。',
+  SESSION_FULL: 'セッションが満員です。',
+  PLAYER_ID_NOT_UNIQUE: 'このプレイヤーIDは既に使用されています。',
 };
 
 /** デフォルトのエラーメッセージ（未知のエラーコード用） */

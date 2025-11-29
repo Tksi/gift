@@ -4,7 +4,9 @@ import type { ApiError } from '~/types/apiError';
 import { type SseEvent, useSse } from '~/composables/useSse';
 import { generateCommandId, sendAction } from '~/utils/actionSender';
 import { type RuleHint, fetchHint } from '~/utils/hintFetcher';
+import { joinSession } from '~/utils/joinFetcher';
 import { type GameResults, fetchResults } from '~/utils/resultsFetcher';
+import { startGame } from '~/utils/startFetcher';
 import {
   type GameStateData,
   type StateSuccessData,
@@ -37,6 +39,12 @@ const stateVersion = ref<string>('');
 
 /** ローディング状態 */
 const isLoading = ref(true);
+
+/** 参加送信中フラグ */
+const isJoinSubmitting = ref(false);
+
+/** ゲーム開始送信中フラグ */
+const isStartSubmitting = ref(false);
 
 /** エラー情報 */
 const error = ref<ApiError | null>(null);
@@ -133,14 +141,22 @@ const loadInitialState = async (): Promise<void> => {
     gameState.value = result.data.state;
     stateVersion.value = result.data.state_version;
 
-    // localStorage からプレイヤー ID を取得（仮実装）
+    // localStorage からプレイヤー ID を取得
     const storedPlayerId = localStorage.getItem(`player_${sessionId.value}`);
 
     if (storedPlayerId !== null && storedPlayerId !== '') {
-      currentPlayerId.value = storedPlayerId;
-    } else if (result.data.state.players.length > 0) {
-      // デモ用：最初のプレイヤーとして扱う
-      currentPlayerId.value = result.data.state.players[0]?.id ?? null;
+      // 保存されているプレイヤーIDが実際に参加者リストに存在するか確認
+      const playerExists = result.data.state.players.some(
+        (p) => p.id === storedPlayerId,
+      );
+
+      if (playerExists) {
+        currentPlayerId.value = storedPlayerId;
+      } else {
+        // プレイヤーIDが無効な場合はクリア
+        localStorage.removeItem(`player_${sessionId.value}`);
+        currentPlayerId.value = null;
+      }
     }
 
     // SSE 接続を開始
@@ -258,11 +274,81 @@ const handleRetry = () => {
   void loadInitialState();
 };
 
+/**
+ * 参加ハンドラ
+ * @param displayName - 表示名
+ */
+const handleJoin = async (displayName: string): Promise<void> => {
+  if (sessionId.value === '' || isJoinSubmitting.value) return;
+
+  isJoinSubmitting.value = true;
+  error.value = null;
+
+  const result = await joinSession(sessionId.value, displayName);
+
+  if (result.success) {
+    // 参加成功: プレイヤー ID を保存
+    currentPlayerId.value = result.data.player.id;
+    localStorage.setItem(`player_${sessionId.value}`, result.data.player.id);
+
+    // 状態を更新
+    gameState.value = result.data.state;
+    stateVersion.value = result.data.state_version;
+  } else {
+    error.value = { code: result.code, status: result.status };
+  }
+
+  isJoinSubmitting.value = false;
+};
+
+/**
+ * ゲーム開始ハンドラ
+ */
+const handleStartGame = async (): Promise<void> => {
+  if (sessionId.value === '' || isStartSubmitting.value) return;
+
+  isStartSubmitting.value = true;
+  error.value = null;
+
+  const result = await startGame(sessionId.value);
+
+  if (result.success) {
+    // 状態を更新
+    gameState.value = result.data.state;
+    stateVersion.value = result.data.state_version;
+  } else {
+    error.value = { code: result.code, status: result.status };
+  }
+
+  isStartSubmitting.value = false;
+};
+
 /** ゲームフェーズ */
 const gamePhase = computed(
   (): 'completed' | 'running' | 'setup' | 'waiting' =>
     gameState.value?.phase ?? 'setup',
 );
+
+/** 待機フェーズかどうか */
+const isWaitingPhase = computed((): boolean => gamePhase.value === 'waiting');
+
+/** 自分が参加済みかどうか */
+const hasJoined = computed((): boolean => {
+  if (currentPlayerId.value === null || gameState.value === null) return false;
+
+  return gameState.value.players.some((p) => p.id === currentPlayerId.value);
+});
+
+/** 現在の参加者一覧 */
+const currentPlayers = computed((): { id: string; displayName: string }[] => {
+  return gameState.value?.players ?? [];
+});
+
+/** 最大参加人数 */
+const maxPlayers = computed((): number => gameState.value?.maxPlayers ?? 7);
+
+/** ゲーム開始可能かどうか（2人以上参加している） */
+const canStartGame = computed((): boolean => currentPlayers.value.length >= 2);
 
 /** 中央カード */
 const cardInCenter = computed((): number | null => {
@@ -398,8 +484,68 @@ watch(sessionId, (newSessionId, oldSessionId) => {
         </div>
       </div>
 
+      <!-- 待機フェーズ: 参加フォームまたは待機画面 -->
+      <div
+        v-if="!isLoading && gameState && isWaitingPhase"
+        class="bg-white max-w-md mx-auto p-6 rounded-xl shadow-md"
+        data-testid="waiting-phase"
+      >
+        <!-- 未参加: 参加フォーム -->
+        <JoinForm
+          v-if="!hasJoined"
+          :current-players="currentPlayers"
+          :is-submitting="isJoinSubmitting"
+          :max-players="maxPlayers"
+          @join="(name: string) => handleJoin(name)"
+        />
+
+        <!-- 参加済み: 待機画面 -->
+        <div v-else data-testid="waiting-room">
+          <h2 class="font-bold mb-4 text-gray-800 text-lg">
+            参加者を待っています...
+          </h2>
+
+          <!-- 参加者リスト -->
+          <div class="border-gray-200 border-t mb-4 pt-4">
+            <h3 class="font-medium mb-2 text-gray-700 text-sm">
+              参加者 ({{ currentPlayers.length }}/{{ maxPlayers }})
+            </h3>
+            <ul class="space-y-1">
+              <li
+                v-for="player in currentPlayers"
+                :key="player.id"
+                class="text-gray-600 text-sm"
+                :class="{
+                  'font-bold text-blue-600': player.id === currentPlayerId,
+                }"
+              >
+                {{ player.displayName }}
+                <span v-if="player.id === currentPlayerId">(あなた)</span>
+              </li>
+            </ul>
+          </div>
+
+          <!-- URL 共有案内 -->
+          <p class="bg-gray-50 mb-4 p-3 rounded-lg text-gray-600 text-sm">
+            URLを共有して参加者を招待してください
+          </p>
+
+          <!-- ゲーム開始ボタン -->
+          <button
+            class="bg-green-600 disabled:cursor-not-allowed disabled:opacity-50 font-medium hover:bg-green-700 min-h-11 mt-4 px-6 py-3 rounded-lg text-white transition-colors w-full"
+            data-testid="start-game-button"
+            :disabled="!canStartGame || isStartSubmitting"
+            @click="() => handleStartGame()"
+          >
+            <span v-if="isStartSubmitting">開始中...</span>
+            <span v-else-if="!canStartGame">2人以上で開始できます</span>
+            <span v-else>ゲームを開始</span>
+          </button>
+        </div>
+      </div>
+
       <!-- ゲーム画面 -->
-      <template v-else-if="gameState && !isCompleted">
+      <template v-else-if="gameState && !isCompleted && !isWaitingPhase">
         <!-- メインレイアウト: デスクトップでは横並び -->
         <div class="flex flex-col gap-6 lg:flex-row lg:gap-8">
           <!-- 左側: 中央盤面 -->
