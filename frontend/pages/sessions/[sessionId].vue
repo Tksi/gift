@@ -602,7 +602,7 @@ watch(sessionId, (newSessionId, oldSessionId) => {
         <!-- アクションパネル（参加者のみ表示） -->
         <ActionPanel
           v-if="!isSpectator"
-          class="bottom-0 fixed left-0 md:mt-6 md:relative md:rounded-lg right-0 rounded-none z-10"
+          class="bottom-0 fixed left-0 sm:mt-6 sm:relative sm:rounded-lg right-0 rounded-none z-10"
           :is-my-turn="isMyTurn"
           :is-submitting="isActionSubmitting"
           :my-chips="myChips"

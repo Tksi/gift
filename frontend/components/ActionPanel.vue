@@ -46,10 +46,10 @@ const handleTakeCard = (): void => {
 
 <template>
   <div
-    class="bg-white border border-gray-200 border-t md:border md:shadow-none md:shadow-sm p-3 shadow-[0_-2px_10px_rgba(0,0,0,0.1)] shadow-sm"
+    class="bg-white border border-gray-200 border-t sm:border sm:shadow-none sm:shadow-sm p-2 shadow-[0_-2px_10px_rgba(0,0,0,0.1)] shadow-sm"
   >
     <!-- アクションボタン -->
-    <div class="flex gap-3">
+    <div class="flex gap-2">
       <!-- チップを置くボタン -->
       <button
         class="bg-amber-500 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:text-gray-500 flex-1 font-medium hover:bg-amber-600 min-h-11 px-4 py-3 rounded-lg text-sm text-white transition-colors"
