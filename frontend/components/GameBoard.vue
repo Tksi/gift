@@ -72,7 +72,7 @@ const deckColorClass = computed((): string => {
       <!-- カードがある場合 -->
       <div v-if="cardInCenter !== null" class="relative">
         <div
-          class="bg-gradient-to-br flex font-bold from-amber-100 h-20 items-center justify-center rounded-lg shadow-inner text-3xl text-amber-800 to-amber-50 w-14"
+          class="bg-gradient-to-br flex font-bold from-amber-100 h-20 items-center justify-center rounded-lg shadow-inner text-3xl text-amber-900 to-amber-50 w-14"
           data-testid="center-card"
         >
           {{ cardInCenter }}
