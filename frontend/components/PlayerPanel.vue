@@ -78,8 +78,9 @@ const turnHighlightClass = computed((): string => {
         <span class="font-semibold text-gray-800">
           {{ player.displayName }}
         </span>
-        <!-- チップ数 -->
+        <!-- チップ数（自分のみ表示） -->
         <div
+          v-if="isSelf"
           class="flex gap-1 items-center text-gray-600"
           data-testid="player-chips"
         >

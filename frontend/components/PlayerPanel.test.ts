@@ -24,13 +24,23 @@ describe('PlayerPanel', () => {
       expect(wrapper.text()).toContain('テストプレイヤー');
     });
 
-    it('所持チップ数を表示する', () => {
+    it('自分のプレイヤーの場合、所持チップ数を表示する', () => {
       const wrapper = mount(PlayerPanel, {
-        props: { ...defaultProps, chips: 8 },
+        props: { ...defaultProps, chips: 8, isSelf: true },
       });
 
       const chipsDisplay = wrapper.find('[data-testid="player-chips"]');
+      expect(chipsDisplay.exists()).toBe(true);
       expect(chipsDisplay.text()).toContain('8');
+    });
+
+    it('他プレイヤーの場合、所持チップ数を表示しない', () => {
+      const wrapper = mount(PlayerPanel, {
+        props: { ...defaultProps, chips: 8, isSelf: false },
+      });
+
+      const chipsDisplay = wrapper.find('[data-testid="player-chips"]');
+      expect(chipsDisplay.exists()).toBe(false);
     });
   });
 
