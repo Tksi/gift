@@ -442,6 +442,11 @@ const isCompleted = computed(
   (): boolean => gamePhase.value === 'completed' && results.value !== null,
 );
 
+/** 観戦者かどうか（ゲームに参加していない） */
+const isSpectator = computed((): boolean => {
+  return !hasJoined.value;
+});
+
 // マウント時に初期状態を取得
 onMounted(() => {
   void loadInitialState();
@@ -618,8 +623,37 @@ watch(sessionId, (newSessionId, oldSessionId) => {
           </div>
         </div>
 
-        <!-- アクションパネル -->
+        <!-- 観戦中バナー -->
+        <div
+          v-if="isSpectator"
+          class="bg-blue-50 border border-blue-200 flex gap-2 items-center justify-center mt-6 p-4 rounded-lg text-blue-700"
+          data-testid="spectator-banner"
+        >
+          <svg
+            class="h-5 w-5"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <path
+              d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          <span class="font-medium">観戦中</span>
+        </div>
+
+        <!-- アクションパネル（参加者のみ表示） -->
         <ActionPanel
+          v-if="!isSpectator"
           class="mt-6"
           :is-my-turn="isMyTurn"
           :is-submitting="isActionSubmitting"
