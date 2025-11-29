@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils';
+import { mountSuspended } from '@nuxt/test-utils/runtime';
 import { describe, expect, it } from 'vitest';
 import ActionPanel from './ActionPanel.vue';
 
@@ -10,16 +10,20 @@ describe('ActionPanel', () => {
   };
 
   describe('ボタン配置', () => {
-    it('「チップを置く」ボタンが表示される', () => {
-      const wrapper = mount(ActionPanel, { props: defaultProps });
+    it('「チップを置く」ボタンが表示される', async () => {
+      const wrapper = await mountSuspended(ActionPanel, {
+        props: defaultProps,
+      });
 
       const placeChipButton = wrapper.find('[data-testid="place-chip-button"]');
       expect(placeChipButton.exists()).toBe(true);
       expect(placeChipButton.text()).toContain('チップを置く');
     });
 
-    it('「カードを取る」ボタンが表示される', () => {
-      const wrapper = mount(ActionPanel, { props: defaultProps });
+    it('「カードを取る」ボタンが表示される', async () => {
+      const wrapper = await mountSuspended(ActionPanel, {
+        props: defaultProps,
+      });
 
       const takeCardButton = wrapper.find('[data-testid="take-card-button"]');
       expect(takeCardButton.exists()).toBe(true);
@@ -27,9 +31,9 @@ describe('ActionPanel', () => {
     });
   });
 
-  describe('手番による有効/無効化', () => {
-    it('自分の手番の場合、両方のボタンが有効', () => {
-      const wrapper = mount(ActionPanel, {
+  describe('手番による有効/無効化', async () => {
+    it('自分の手番の場合、両方のボタンが有効', async () => {
+      const wrapper = await mountSuspended(ActionPanel, {
         props: { ...defaultProps, isMyTurn: true, myChips: 5 },
       });
 
@@ -40,8 +44,8 @@ describe('ActionPanel', () => {
       expect(takeCardButton.attributes('disabled')).toBeUndefined();
     });
 
-    it('自分の手番でない場合、両方のボタンが無効', () => {
-      const wrapper = mount(ActionPanel, {
+    it('自分の手番でない場合、両方のボタンが無効', async () => {
+      const wrapper = await mountSuspended(ActionPanel, {
         props: { ...defaultProps, isMyTurn: false },
       });
 
@@ -53,9 +57,9 @@ describe('ActionPanel', () => {
     });
   });
 
-  describe('チップ残量による無効化', () => {
-    it('チップ残量が0の場合、「チップを置く」ボタンが無効', () => {
-      const wrapper = mount(ActionPanel, {
+  describe('チップ残量による無効化', async () => {
+    it('チップ残量が0の場合、「チップを置く」ボタンが無効', async () => {
+      const wrapper = await mountSuspended(ActionPanel, {
         props: { ...defaultProps, isMyTurn: true, myChips: 0 },
       });
 
@@ -63,8 +67,8 @@ describe('ActionPanel', () => {
       expect(placeChipButton.attributes('disabled')).toBe('');
     });
 
-    it('チップ残量が0の場合でも、「カードを取る」ボタンは有効', () => {
-      const wrapper = mount(ActionPanel, {
+    it('チップ残量が0の場合でも、「カードを取る」ボタンは有効', async () => {
+      const wrapper = await mountSuspended(ActionPanel, {
         props: { ...defaultProps, isMyTurn: true, myChips: 0 },
       });
 
@@ -74,8 +78,8 @@ describe('ActionPanel', () => {
   });
 
   describe('ローディング状態', () => {
-    it('送信中の場合、両方のボタンが無効化される', () => {
-      const wrapper = mount(ActionPanel, {
+    it('送信中の場合、両方のボタンが無効化される', async () => {
+      const wrapper = await mountSuspended(ActionPanel, {
         props: { ...defaultProps, isSubmitting: true },
       });
 
@@ -89,7 +93,9 @@ describe('ActionPanel', () => {
 
   describe('イベント発火', () => {
     it('「チップを置く」ボタンクリックで placeChip イベントが発火する', async () => {
-      const wrapper = mount(ActionPanel, { props: defaultProps });
+      const wrapper = await mountSuspended(ActionPanel, {
+        props: defaultProps,
+      });
 
       await wrapper.find('[data-testid="place-chip-button"]').trigger('click');
 
@@ -97,7 +103,9 @@ describe('ActionPanel', () => {
     });
 
     it('「カードを取る」ボタンクリックで takeCard イベントが発火する', async () => {
-      const wrapper = mount(ActionPanel, { props: defaultProps });
+      const wrapper = await mountSuspended(ActionPanel, {
+        props: defaultProps,
+      });
 
       await wrapper.find('[data-testid="take-card-button"]').trigger('click');
 
@@ -105,7 +113,7 @@ describe('ActionPanel', () => {
     });
 
     it('無効化されたボタンはイベントを発火しない', async () => {
-      const wrapper = mount(ActionPanel, {
+      const wrapper = await mountSuspended(ActionPanel, {
         props: { ...defaultProps, isMyTurn: false },
       });
 
@@ -118,8 +126,10 @@ describe('ActionPanel', () => {
   });
 
   describe('タッチ操作対応', () => {
-    it('ボタンが最小44x44pxのサイズを持つ', () => {
-      const wrapper = mount(ActionPanel, { props: defaultProps });
+    it('ボタンが最小44x44pxのサイズを持つ', async () => {
+      const wrapper = await mountSuspended(ActionPanel, {
+        props: defaultProps,
+      });
 
       const placeChipButton = wrapper.find('[data-testid="place-chip-button"]');
       const takeCardButton = wrapper.find('[data-testid="take-card-button"]');

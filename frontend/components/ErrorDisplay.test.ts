@@ -1,12 +1,12 @@
-import { mount } from '@vue/test-utils';
+import { mountSuspended } from '@nuxt/test-utils/runtime';
 import { describe, expect, it } from 'vitest';
 
 import ErrorDisplay from './ErrorDisplay.vue';
 
 describe('ErrorDisplay', () => {
   describe('エラーがnullの場合', () => {
-    it('何も表示しない', () => {
-      const wrapper = mount(ErrorDisplay, {
+    it('何も表示しない', async () => {
+      const wrapper = await mountSuspended(ErrorDisplay, {
         props: { error: null },
       });
 
@@ -15,8 +15,8 @@ describe('ErrorDisplay', () => {
   });
 
   describe('エラーがある場合', () => {
-    it('日本語エラーメッセージを表示する', () => {
-      const wrapper = mount(ErrorDisplay, {
+    it('日本語エラーメッセージを表示する', async () => {
+      const wrapper = await mountSuspended(ErrorDisplay, {
         props: {
           error: { code: 'SESSION_NOT_FOUND', status: 404 },
         },
@@ -25,8 +25,8 @@ describe('ErrorDisplay', () => {
       expect(wrapper.text()).toContain('セッションが見つかりません。');
     });
 
-    it('未知のエラーコードはデフォルトメッセージを表示する', () => {
-      const wrapper = mount(ErrorDisplay, {
+    it('未知のエラーコードはデフォルトメッセージを表示する', async () => {
+      const wrapper = await mountSuspended(ErrorDisplay, {
         props: {
           error: { code: 'UNKNOWN_CODE', status: 500 },
         },
@@ -38,7 +38,7 @@ describe('ErrorDisplay', () => {
     });
 
     it('閉じるボタンをクリックすると dismiss イベントを発火する', async () => {
-      const wrapper = mount(ErrorDisplay, {
+      const wrapper = await mountSuspended(ErrorDisplay, {
         props: {
           error: { code: 'SESSION_NOT_FOUND', status: 404 },
         },
@@ -50,7 +50,7 @@ describe('ErrorDisplay', () => {
     });
 
     it('リトライボタンをクリックすると retry イベントを発火する', async () => {
-      const wrapper = mount(ErrorDisplay, {
+      const wrapper = await mountSuspended(ErrorDisplay, {
         props: {
           error: { code: 'NETWORK_ERROR', status: 0 },
         },
@@ -63,8 +63,8 @@ describe('ErrorDisplay', () => {
   });
 
   describe('404 エラーの場合', () => {
-    it('ホームへの導線を表示する', () => {
-      const wrapper = mount(ErrorDisplay, {
+    it('ホームへの導線を表示する', async () => {
+      const wrapper = await mountSuspended(ErrorDisplay, {
         props: {
           error: { code: 'SESSION_NOT_FOUND', status: 404 },
         },
@@ -75,8 +75,8 @@ describe('ErrorDisplay', () => {
   });
 
   describe('404 以外のエラーの場合', () => {
-    it('ホームへの導線を表示しない', () => {
-      const wrapper = mount(ErrorDisplay, {
+    it('ホームへの導線を表示しない', async () => {
+      const wrapper = await mountSuspended(ErrorDisplay, {
         props: {
           error: { code: 'NETWORK_ERROR', status: 0 },
         },
@@ -87,8 +87,8 @@ describe('ErrorDisplay', () => {
   });
 
   describe('レスポンシブ対応', () => {
-    it('トースト要素が存在する', () => {
-      const wrapper = mount(ErrorDisplay, {
+    it('トースト要素が存在する', async () => {
+      const wrapper = await mountSuspended(ErrorDisplay, {
         props: {
           error: { code: 'SESSION_NOT_FOUND', status: 404 },
         },

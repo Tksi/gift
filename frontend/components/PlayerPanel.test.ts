@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils';
+import { mountSuspended } from '@nuxt/test-utils/runtime';
 import { describe, expect, it } from 'vitest';
 
 import PlayerPanel from './PlayerPanel.vue';
@@ -16,16 +16,16 @@ describe('PlayerPanel', () => {
   };
 
   describe('プレイヤー情報表示', () => {
-    it('プレイヤー名を表示する', () => {
-      const wrapper = mount(PlayerPanel, {
+    it('プレイヤー名を表示する', async () => {
+      const wrapper = await mountSuspended(PlayerPanel, {
         props: defaultProps,
       });
 
       expect(wrapper.text()).toContain('テストプレイヤー');
     });
 
-    it('自分のプレイヤーの場合、所持チップ数を表示する', () => {
-      const wrapper = mount(PlayerPanel, {
+    it('自分のプレイヤーの場合、所持チップ数を表示する', async () => {
+      const wrapper = await mountSuspended(PlayerPanel, {
         props: { ...defaultProps, chips: 8, isSelf: true },
       });
 
@@ -34,8 +34,8 @@ describe('PlayerPanel', () => {
       expect(chipsDisplay.text()).toContain('8');
     });
 
-    it('他プレイヤーの場合、所持チップ数を表示しない', () => {
-      const wrapper = mount(PlayerPanel, {
+    it('他プレイヤーの場合、所持チップ数を表示しない', async () => {
+      const wrapper = await mountSuspended(PlayerPanel, {
         props: { ...defaultProps, chips: 8, isSelf: false },
       });
 
@@ -45,8 +45,8 @@ describe('PlayerPanel', () => {
   });
 
   describe('獲得済みカード表示', () => {
-    it('獲得済みカードを表示する', () => {
-      const wrapper = mount(PlayerPanel, {
+    it('獲得済みカードを表示する', async () => {
+      const wrapper = await mountSuspended(PlayerPanel, {
         props: defaultProps,
       });
 
@@ -54,9 +54,9 @@ describe('PlayerPanel', () => {
       expect(cardsDisplay.exists()).toBe(true);
     });
 
-    it('連番カードをグループ化して表示する', () => {
+    it('連番カードをグループ化して表示する', async () => {
       // カード: 3, 5, 6, 15, 16, 17 → グループ: [3], [5,6], [15,16,17]
-      const wrapper = mount(PlayerPanel, {
+      const wrapper = await mountSuspended(PlayerPanel, {
         props: defaultProps,
       });
 
@@ -64,8 +64,8 @@ describe('PlayerPanel', () => {
       expect(cardSets.length).toBe(3);
     });
 
-    it('カードがない場合は空の状態を表示する', () => {
-      const wrapper = mount(PlayerPanel, {
+    it('カードがない場合は空の状態を表示する', async () => {
+      const wrapper = await mountSuspended(PlayerPanel, {
         props: { ...defaultProps, cards: [] },
       });
 
@@ -75,8 +75,8 @@ describe('PlayerPanel', () => {
   });
 
   describe('手番ハイライト', () => {
-    it('現在の手番プレイヤーをハイライト表示する', () => {
-      const wrapper = mount(PlayerPanel, {
+    it('現在の手番プレイヤーをハイライト表示する', async () => {
+      const wrapper = await mountSuspended(PlayerPanel, {
         props: { ...defaultProps, isCurrentTurn: true },
       });
 
@@ -85,8 +85,8 @@ describe('PlayerPanel', () => {
       expect(panel.classes()).toContain('ring-blue-500');
     });
 
-    it('手番でない場合はハイライトしない', () => {
-      const wrapper = mount(PlayerPanel, {
+    it('手番でない場合はハイライトしない', async () => {
+      const wrapper = await mountSuspended(PlayerPanel, {
         props: { ...defaultProps, isCurrentTurn: false },
       });
 
@@ -96,8 +96,8 @@ describe('PlayerPanel', () => {
   });
 
   describe('自分自身のスタイル', () => {
-    it('自分自身のパネルを識別可能なスタイルで表示する', () => {
-      const wrapper = mount(PlayerPanel, {
+    it('自分自身のパネルを識別可能なスタイルで表示する', async () => {
+      const wrapper = await mountSuspended(PlayerPanel, {
         props: { ...defaultProps, isSelf: true },
       });
 
@@ -105,8 +105,8 @@ describe('PlayerPanel', () => {
       expect(panel.classes()).toContain('bg-blue-50');
     });
 
-    it('他プレイヤーは通常スタイルで表示する', () => {
-      const wrapper = mount(PlayerPanel, {
+    it('他プレイヤーは通常スタイルで表示する', async () => {
+      const wrapper = await mountSuspended(PlayerPanel, {
         props: { ...defaultProps, isSelf: false },
       });
 
@@ -116,8 +116,8 @@ describe('PlayerPanel', () => {
   });
 
   describe('手番と自分自身の組み合わせ', () => {
-    it('自分自身かつ手番の場合、両方のスタイルが適用される', () => {
-      const wrapper = mount(PlayerPanel, {
+    it('自分自身かつ手番の場合、両方のスタイルが適用される', async () => {
+      const wrapper = await mountSuspended(PlayerPanel, {
         props: { ...defaultProps, isCurrentTurn: true, isSelf: true },
       });
 

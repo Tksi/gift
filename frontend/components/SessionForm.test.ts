@@ -1,12 +1,12 @@
-import { mount } from '@vue/test-utils';
+import { mountSuspended } from '@nuxt/test-utils/runtime';
 import { describe, expect, it } from 'vitest';
 
 import SessionForm from './SessionForm.vue';
 
 describe('SessionForm', () => {
   describe('初期表示', () => {
-    it('送信ボタンが表示される', () => {
-      const wrapper = mount(SessionForm, {
+    it('送信ボタンが表示される', async () => {
+      const wrapper = await mountSuspended(SessionForm, {
         props: { isSubmitting: false },
       });
 
@@ -17,7 +17,7 @@ describe('SessionForm', () => {
 
   describe('送信イベント', () => {
     it('フォーム送信時に submit イベントを発火する', async () => {
-      const wrapper = mount(SessionForm, {
+      const wrapper = await mountSuspended(SessionForm, {
         props: { isSubmitting: false },
       });
 
@@ -28,8 +28,8 @@ describe('SessionForm', () => {
   });
 
   describe('ローディング状態', () => {
-    it('isSubmitting が true の場合は送信ボタンが無効', () => {
-      const wrapper = mount(SessionForm, {
+    it('isSubmitting が true の場合は送信ボタンが無効', async () => {
+      const wrapper = await mountSuspended(SessionForm, {
         props: { isSubmitting: true },
       });
 
@@ -37,8 +37,8 @@ describe('SessionForm', () => {
       expect(submitButton.attributes('disabled')).toBeDefined();
     });
 
-    it('isSubmitting が true の場合はローディング表示', () => {
-      const wrapper = mount(SessionForm, {
+    it('isSubmitting が true の場合はローディング表示', async () => {
+      const wrapper = await mountSuspended(SessionForm, {
         props: { isSubmitting: true },
       });
 
@@ -47,8 +47,8 @@ describe('SessionForm', () => {
   });
 
   describe('タッチ操作対応', () => {
-    it('送信ボタンは最小 44px の高さを持つ', () => {
-      const wrapper = mount(SessionForm, {
+    it('送信ボタンは最小 44px の高さを持つ', async () => {
+      const wrapper = await mountSuspended(SessionForm, {
         props: { isSubmitting: false },
       });
 

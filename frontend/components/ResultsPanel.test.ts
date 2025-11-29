@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { mountSuspended } from '@nuxt/test-utils/runtime';
 import ResultsPanel from './ResultsPanel.vue';
 
 /**
@@ -71,10 +71,10 @@ const createTestPlayerMap = (
 
 describe('ResultsPanel', () => {
   describe('プレイヤー順位表示', () => {
-    it('順位、プレイヤー名、スコアを表示する', () => {
+    it('順位、プレイヤー名、スコアを表示する', async () => {
       const results = createTestResults();
       const playerMap = createTestPlayerMap();
-      const wrapper = mount(ResultsPanel, {
+      const wrapper = await mountSuspended(ResultsPanel, {
         props: {
           results,
           playerMap,
@@ -95,10 +95,10 @@ describe('ResultsPanel', () => {
       expect(wrapper.text()).toContain('35');
     });
 
-    it('残りチップ数を表示する', () => {
+    it('残りチップ数を表示する', async () => {
       const results = createTestResults();
       const playerMap = createTestPlayerMap();
-      const wrapper = mount(ResultsPanel, {
+      const wrapper = await mountSuspended(ResultsPanel, {
         props: {
           results,
           playerMap,
@@ -111,7 +111,7 @@ describe('ResultsPanel', () => {
       expect(wrapper.text()).toContain('0枚');
     });
 
-    it('獲得カードを表示する', () => {
+    it('獲得カードを表示する', async () => {
       const results = createTestResults({
         placements: [
           createTestPlacement({
@@ -124,7 +124,7 @@ describe('ResultsPanel', () => {
         tieBreak: null,
       });
       const playerMap = createTestPlayerMap();
-      const wrapper = mount(ResultsPanel, {
+      const wrapper = await mountSuspended(ResultsPanel, {
         props: {
           results,
           playerMap,
@@ -139,10 +139,10 @@ describe('ResultsPanel', () => {
   });
 
   describe('勝者ハイライト', () => {
-    it('1位のプレイヤーがハイライト表示される', () => {
+    it('1位のプレイヤーがハイライト表示される', async () => {
       const results = createTestResults();
       const playerMap = createTestPlayerMap();
-      const wrapper = mount(ResultsPanel, {
+      const wrapper = await mountSuspended(ResultsPanel, {
         props: {
           results,
           playerMap,
@@ -155,10 +155,10 @@ describe('ResultsPanel', () => {
       expect(winnerRow.classes()).toContain('bg-amber-50');
     });
 
-    it('2位以降のプレイヤーはハイライト表示されない', () => {
+    it('2位以降のプレイヤーはハイライト表示されない', async () => {
       const results = createTestResults();
       const playerMap = createTestPlayerMap();
-      const wrapper = mount(ResultsPanel, {
+      const wrapper = await mountSuspended(ResultsPanel, {
         props: {
           results,
           playerMap,
@@ -173,7 +173,7 @@ describe('ResultsPanel', () => {
   });
 
   describe('タイブレーク情報', () => {
-    it('タイブレークがある場合、その情報を表示名で表示する', () => {
+    it('タイブレークがある場合、その情報を表示名で表示する', async () => {
       const results = createTestResults({
         tieBreak: {
           reason: 'chipCount',
@@ -183,7 +183,7 @@ describe('ResultsPanel', () => {
         },
       });
       const playerMap = createTestPlayerMap();
-      const wrapper = mount(ResultsPanel, {
+      const wrapper = await mountSuspended(ResultsPanel, {
         props: {
           results,
           playerMap,
@@ -197,10 +197,10 @@ describe('ResultsPanel', () => {
       expect(wrapper.text()).toContain('プレイヤー2');
     });
 
-    it('タイブレークがない場合、タイブレーク情報を表示しない', () => {
+    it('タイブレークがない場合、タイブレーク情報を表示しない', async () => {
       const results = createTestResults({ tieBreak: null });
       const playerMap = createTestPlayerMap();
-      const wrapper = mount(ResultsPanel, {
+      const wrapper = await mountSuspended(ResultsPanel, {
         props: {
           results,
           playerMap,
@@ -213,7 +213,7 @@ describe('ResultsPanel', () => {
       );
     });
 
-    it('タイブレークで勝者が決まらない場合（同点継続）を表示する', () => {
+    it('タイブレークで勝者が決まらない場合（同点継続）を表示する', async () => {
       const results = createTestResults({
         tieBreak: {
           reason: 'chipCount',
@@ -223,7 +223,7 @@ describe('ResultsPanel', () => {
         },
       });
       const playerMap = createTestPlayerMap();
-      const wrapper = mount(ResultsPanel, {
+      const wrapper = await mountSuspended(ResultsPanel, {
         props: {
           results,
           playerMap,
@@ -236,10 +236,10 @@ describe('ResultsPanel', () => {
   });
 
   describe('再戦ボタン', () => {
-    it('再戦するボタンが表示される', () => {
+    it('再戦するボタンが表示される', async () => {
       const results = createTestResults();
       const playerMap = createTestPlayerMap();
-      const wrapper = mount(ResultsPanel, {
+      const wrapper = await mountSuspended(ResultsPanel, {
         props: {
           results,
           playerMap,
@@ -254,7 +254,7 @@ describe('ResultsPanel', () => {
     it('ボタンクリックで rematch イベントが発火する', async () => {
       const results = createTestResults();
       const playerMap = createTestPlayerMap();
-      const wrapper = mount(ResultsPanel, {
+      const wrapper = await mountSuspended(ResultsPanel, {
         props: {
           results,
           playerMap,
@@ -267,10 +267,10 @@ describe('ResultsPanel', () => {
       expect(wrapper.emitted('rematch')).toHaveLength(1);
     });
 
-    it('送信中はボタンが無効化され、ローディングテキストが表示される', () => {
+    it('送信中はボタンが無効化され、ローディングテキストが表示される', async () => {
       const results = createTestResults();
       const playerMap = createTestPlayerMap();
-      const wrapper = mount(ResultsPanel, {
+      const wrapper = await mountSuspended(ResultsPanel, {
         props: {
           results,
           playerMap,
@@ -285,10 +285,10 @@ describe('ResultsPanel', () => {
   });
 
   describe('タッチ操作対応', () => {
-    it('再戦ボタンは最小 44px の高さを持つ', () => {
+    it('再戦ボタンは最小 44px の高さを持つ', async () => {
       const results = createTestResults();
       const playerMap = createTestPlayerMap();
-      const wrapper = mount(ResultsPanel, {
+      const wrapper = await mountSuspended(ResultsPanel, {
         props: {
           results,
           playerMap,
