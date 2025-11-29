@@ -1,0 +1,27 @@
+services:
+  frontend:
+    image: node:24
+    init: true
+    volumes:
+      - ./frontend:/app/frontend
+      - ./hc:/app/hc
+    working_dir: /app/frontend
+    command: npm run start
+    restart: unless-stopped 
+  backend:
+    image: node:24
+    init: true
+    volumes:
+      - ./backend:/app/backend
+    working_dir: /app/backend
+    command: npm run start
+    restart: unless-stopped 
+  tunnel:
+    image: cloudflare/cloudflared
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
+    restart: unless-stopped 
+    depends_on:
+      - frontend
+      - backend

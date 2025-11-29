@@ -4,7 +4,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "rolldown -c",
-    "start": "node dist/index.js",
+    "start": "tsx src/index.ts",
     "format:check": "prettier . --cache --check --ignore-path .gitignore",
     "lint:check": "eslint **/*.{js,ts} --concurrency auto --cache --cache-location node_modules/.cache/.eslintcache",
     "type:check": "tsc --noEmit",
