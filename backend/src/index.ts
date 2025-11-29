@@ -1,5 +1,4 @@
 import { serve } from '@hono/node-server';
-import { hc } from 'hono/client';
 import { createApp } from './app.js';
 
 const app = createApp();
@@ -16,10 +15,3 @@ if (import.meta.main as boolean) {
     },
   );
 }
-
-// this is a trick to calculate the type when compiling
-export type Client = ReturnType<typeof hc<typeof app>>;
-
-// eslint-disable-next-line jsdoc/require-jsdoc
-export const hcWithType = (...args: Parameters<typeof hc>): Client =>
-  hc<typeof app>(...args);
