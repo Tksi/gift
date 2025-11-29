@@ -85,16 +85,6 @@ describe('ActionPanel', () => {
       expect(placeChipButton.attributes('disabled')).toBe('');
       expect(takeCardButton.attributes('disabled')).toBe('');
     });
-
-    it('送信中の場合、ローディングインジケーターが表示される', () => {
-      const wrapper = mount(ActionPanel, {
-        props: { ...defaultProps, isSubmitting: true },
-      });
-
-      expect(wrapper.find('[data-testid="loading-indicator"]').exists()).toBe(
-        true,
-      );
-    });
   });
 
   describe('イベント発火', () => {

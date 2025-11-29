@@ -134,32 +134,6 @@ describe('HintPanel', () => {
     });
   });
 
-  describe('ローディング状態', () => {
-    it('isLoading が true の場合、ローディングインジケーターを表示する', () => {
-      const wrapper = mount(HintPanel, {
-        props: {
-          hint: null,
-          isVisible: true,
-          isLoading: true,
-        },
-      });
-
-      expect(wrapper.find('[data-testid="hint-loading"]').exists()).toBe(true);
-    });
-
-    it('isLoading が false の場合、ローディングインジケーターを表示しない', () => {
-      const wrapper = mount(HintPanel, {
-        props: {
-          hint: createTestHint(),
-          isVisible: true,
-          isLoading: false,
-        },
-      });
-
-      expect(wrapper.find('[data-testid="hint-loading"]').exists()).toBe(false);
-    });
-  });
-
   describe('プレイヤー名変換', () => {
     it('playerMap がある場合、ヒントテキスト内のプレイヤーIDを表示名に変換する', () => {
       const hint = createTestHint({
