@@ -1,6 +1,6 @@
 import type { ErrorDetail } from 'services/errors.js';
 import type { MonitoringService } from 'services/monitoringService.js';
-import type { EventLogEntry, GameSnapshot } from 'states/inMemoryGameStore.js';
+import type { GameSnapshot } from 'states/inMemoryGameStore.js';
 
 export type SseEventPayload = {
   id: string;
@@ -32,7 +32,6 @@ export type SseBroadcastGateway = {
     version: string,
   ) => void;
   publishSystemError: (sessionId: string, payload: ErrorDetail) => void;
-  publishEventLog: (sessionId: string, entry: EventLogEntry) => void;
 };
 
 const MAX_EVENT_HISTORY = 100;
@@ -245,21 +244,10 @@ export const createSseBroadcastGateway = (
     broadcast(sessionId, createSystemErrorEvent(sessionId, payload));
   };
 
-  const publishEventLog = (sessionId: string, entry: EventLogEntry) => {
-    const event: SseEventPayload = {
-      id: entry.id,
-      event: 'event.log',
-      data: JSON.stringify(entry),
-    };
-
-    broadcast(sessionId, event, { remember: false });
-  };
-
   return {
     connect,
     publishStateDelta,
     publishStateFinal,
     publishSystemError,
-    publishEventLog,
   };
 };

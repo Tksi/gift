@@ -82,7 +82,6 @@ export const sessionResultsGetApp = new OpenAPIHono<SessionEnv>().openapi(
       {
         session_id: envelope.snapshot.sessionId,
         final_results: finalResults,
-        event_log: envelope.eventLog,
       },
       200,
     );

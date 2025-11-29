@@ -29,14 +29,12 @@ const createSseGatewayStub = (): SseBroadcastGateway => {
   const publishStateDelta = vi.fn();
   const publishStateFinal = vi.fn();
   const publishSystemError = vi.fn();
-  const publishEventLog = vi.fn();
 
   return {
     connect,
     publishStateDelta,
     publishStateFinal,
     publishSystemError,
-    publishEventLog,
   };
 };
 

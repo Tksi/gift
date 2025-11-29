@@ -62,11 +62,6 @@ export const sessionStreamGetApp = new OpenAPIHono<SessionEnv>().openapi(
     }
 
     const lastEventIdHeader = c.req.header('last-event-id');
-    const logReplayAfterId = deps.eventLogService.isEventLogId(
-      lastEventIdHeader ?? null,
-    )
-      ? (lastEventIdHeader ?? undefined)
-      : undefined;
     let connection: { disconnect: () => void } | null = null;
     let keepAliveHandle: ReturnType<typeof setInterval> | null = null;
 
@@ -107,23 +102,6 @@ export const sessionStreamGetApp = new OpenAPIHono<SessionEnv>().openapi(
           void stream.write(': keep-alive\n\n');
         }, KEEP_ALIVE_INTERVAL_MS);
 
-        const replayInput: Parameters<
-          typeof deps.eventLogService.replayEntries
-        >[0] = {
-          sessionId,
-          send: (entry) =>
-            stream.writeSSE({
-              id: entry.id,
-              event: 'event.log',
-              data: JSON.stringify(entry),
-            }),
-        };
-
-        if (logReplayAfterId !== undefined) {
-          replayInput.lastEventId = logReplayAfterId;
-        }
-
-        await deps.eventLogService.replayEntries(replayInput);
         await new Promise<void>((resolve) => {
           stream.onAbort(() => {
             cleanup();

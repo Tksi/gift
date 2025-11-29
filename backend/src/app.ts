@@ -8,17 +8,11 @@ import { createSessionDepsMiddleware } from 'routes/sessions/types.js';
 import { sessionActionsPostApp } from 'routes/sessions/{sessionId}/actions.post.js';
 import { sessionGetApp } from 'routes/sessions/{sessionId}/index.get.js';
 import { sessionJoinPostApp } from 'routes/sessions/{sessionId}/join.post.js';
-import { logsExportCsvGetApp } from 'routes/sessions/{sessionId}/logs/export.csv.get.js';
-import { logsExportJsonGetApp } from 'routes/sessions/{sessionId}/logs/export.json.get.js';
 import { sessionRematchPostApp } from 'routes/sessions/{sessionId}/rematch.post.js';
 import { sessionResultsGetApp } from 'routes/sessions/{sessionId}/results.get.js';
 import { sessionStartPostApp } from 'routes/sessions/{sessionId}/start.post.js';
 import { sessionStateGetApp } from 'routes/sessions/{sessionId}/state.get.js';
 import { sessionStreamGetApp } from 'routes/sessions/{sessionId}/stream.get.js';
-import {
-  type EventLogService,
-  createEventLogService,
-} from 'services/eventLogService.js';
 import {
   type MonitoringService,
   createMonitoringService,
@@ -46,7 +40,6 @@ export type CreateAppOptions = {
   timerSupervisor?: TimerSupervisor;
   turnTimeoutMs?: number;
   sseGateway?: SseBroadcastGateway;
-  eventLogService?: EventLogService;
   monitoring?: MonitoringService;
 };
 
@@ -71,12 +64,6 @@ export const createApp = (options: CreateAppOptions = {}) => {
     options.monitoring ?? createMonitoringService({ log: defaultLogger });
   const sseGateway =
     options.sseGateway ?? createSseBroadcastGateway({ monitoring });
-  const eventLogService =
-    options.eventLogService ??
-    createEventLogService({
-      store,
-      sseGateway,
-    });
   const timerSupervisor =
     options.timerSupervisor ??
     createTimerSupervisor({
@@ -92,7 +79,6 @@ export const createApp = (options: CreateAppOptions = {}) => {
     now,
     timerSupervisor,
     turnTimeoutMs,
-    eventLogs: eventLogService,
     monitoring,
   });
 
@@ -104,7 +90,6 @@ export const createApp = (options: CreateAppOptions = {}) => {
     timerSupervisor,
     turnTimeoutMs,
     sseGateway,
-    eventLogService,
     monitoring,
   };
 
@@ -128,8 +113,6 @@ export const createApp = (options: CreateAppOptions = {}) => {
     .route('/', sessionJoinPostApp)
     .route('/', sessionStartPostApp)
     .route('/', sessionRematchPostApp)
-    .route('/', logsExportCsvGetApp)
-    .route('/', logsExportJsonGetApp)
     .doc('/doc', {
       openapi: '3.0.0',
       info: {

@@ -12,7 +12,6 @@ import {
   type TimerSupervisor,
   calculateTurnDeadline,
 } from 'services/timerSupervisor.js';
-import type { EventLogService } from 'services/eventLogService.js';
 import type { MonitoringService } from 'services/monitoringService.js';
 import type {
   GameSnapshot,
@@ -34,7 +33,6 @@ export type TurnDecisionDependencies = {
   now: () => string;
   timerSupervisor: TimerSupervisor;
   turnTimeoutMs: number;
-  eventLogs: EventLogService;
   monitoring?: MonitoringService;
 };
 
@@ -284,21 +282,7 @@ export const createTurnDecisionService = (
         const snapshot = cloneSnapshot(current.snapshot);
         ensureActionAllowed(snapshot, input);
 
-        const actingPlayerId =
-          input.playerId === 'system'
-            ? snapshot.turnState.currentPlayerId
-            : input.playerId;
-        const actionTurn = snapshot.turnState.turn;
-        const cardBeforeAction = snapshot.turnState.cardInCenter;
-        const centralPotBeforeAction = snapshot.centralPot;
-        const chipsBeforeAction =
-          snapshot.chips[actingPlayerId] ?? snapshot.chips[input.playerId] ?? 0;
-
         applyAction(snapshot, input);
-
-        const chipsAfterAction =
-          snapshot.chips[actingPlayerId] ?? snapshot.chips[input.playerId] ?? 0;
-        const centralPotAfterAction = snapshot.centralPot;
 
         if (snapshot.phase === 'setup') {
           snapshot.phase = 'running';
@@ -308,32 +292,13 @@ export const createTurnDecisionService = (
         snapshot.updatedAt = timestamp;
         updateTurnDeadline(snapshot, timestamp, dependencies.turnTimeoutMs);
 
-        if (input.action === 'placeChip' || input.action === 'takeCard') {
-          dependencies.eventLogs.recordAction({
-            sessionId: snapshot.sessionId,
-            turn: actionTurn,
-            actor: input.playerId,
-            targetPlayer: actingPlayerId,
-            action: input.action,
-            card: cardBeforeAction,
-            centralPotBefore: centralPotBeforeAction,
-            centralPotAfter: centralPotAfterAction,
-            chipsBefore: chipsBeforeAction,
-            chipsAfter: chipsAfterAction,
-            timestamp,
-          });
-        }
-
-        let finalSummary: ReturnType<typeof calculateScoreSummary> | null =
-          null;
-
         if (
           snapshot.finalResults === null &&
           snapshot.phase !== 'completed' &&
           isGameCompleted(snapshot)
         ) {
           snapshot.phase = 'completed';
-          finalSummary = calculateScoreSummary(snapshot);
+          const finalSummary = calculateScoreSummary(snapshot);
           snapshot.finalResults = finalSummary;
           snapshot.turnState.deadline = null;
         }
@@ -358,19 +323,6 @@ export const createTurnDecisionService = (
           );
         } else {
           dependencies.timerSupervisor.clear(saved.snapshot.sessionId);
-        }
-
-        if (finalSummary !== null) {
-          dependencies.eventLogs.recordSystemEvent({
-            sessionId: saved.snapshot.sessionId,
-            turn: saved.snapshot.turnState.turn,
-            actor: 'system',
-            action: 'gameCompleted',
-            timestamp,
-            details: {
-              finalResults: finalSummary,
-            },
-          });
         }
 
         return {

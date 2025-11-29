@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { createInMemoryGameStore } from 'states/inMemoryGameStore.js';
 import { describe, expect, it } from 'vitest';
-import type { EventLogEntry, GameSnapshot } from 'states/inMemoryGameStore.js';
+import type { GameSnapshot } from 'states/inMemoryGameStore.js';
 
 type SnapshotOptions = {
   sessionId?: string;
@@ -40,17 +40,6 @@ const makeSnapshot = ({
   maxPlayers: 2,
 });
 
-const makeLogEntry = (
-  overrides: Partial<EventLogEntry> = {},
-): EventLogEntry => ({
-  id: 'turn-1-log-1',
-  turn: 1,
-  actor: 'alice',
-  action: 'placeChip',
-  timestamp: '2025-01-01T00:00:00.000Z',
-  ...overrides,
-});
-
 describe('createInMemoryGameStore の挙動', () => {
   it('スナップショットを保存し sha1 のバージョンを返す', () => {
     const store = createInMemoryGameStore();
@@ -77,23 +66,6 @@ describe('createInMemoryGameStore の挙動', () => {
 
     const fresh = store.getSnapshot(snapshot.sessionId);
     expect(fresh?.deck).toEqual([10, 11, 12]);
-  });
-
-  it('イベントログを追記しカーソル ID でフィルタリングできる', () => {
-    const store = createInMemoryGameStore();
-    const snapshot = makeSnapshot();
-    store.saveSnapshot(snapshot);
-
-    const first = makeLogEntry();
-    const second = makeLogEntry({ id: 'turn-1-log-2', action: 'takeCard' });
-
-    store.appendEventLog(snapshot.sessionId, [first, second]);
-
-    const allEntries = store.listEventLogAfter(snapshot.sessionId);
-    expect(allEntries).toEqual([first, second]);
-
-    const afterFirst = store.listEventLogAfter(snapshot.sessionId, first.id);
-    expect(afterFirst).toEqual([second]);
   });
 
   it('冪等性チェック用に処理済みコマンドを記録する', () => {
@@ -129,13 +101,6 @@ describe('createInMemoryGameStore の挙動', () => {
     expect(summary.phase).toBe('completed');
     expect(summary.updatedAt).toBe('2025-01-02T00:00:00.000Z');
     expect(typeof summary.version).toBe('string');
-  });
-
-  it('存在しないセッションにログを追加すると分かりやすいエラーを投げる', () => {
-    const store = createInMemoryGameStore();
-    expect(() =>
-      store.appendEventLog('missing-session', [makeLogEntry()]),
-    ).toThrowError('Session missing-session is not initialized');
   });
 
   describe('pruneSessionsOlderThan', () => {

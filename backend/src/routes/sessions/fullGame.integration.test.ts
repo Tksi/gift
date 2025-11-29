@@ -24,12 +24,6 @@ type ActionResponse = SessionResponse & {
 type ResultsResponse = {
   session_id: string;
   final_results: ScoreSummary;
-  event_log: {
-    id: string;
-    turn: number;
-    actor: string;
-    action: string;
-  }[];
 };
 
 type SseEvent = {
@@ -177,19 +171,6 @@ const getResults = async (
   };
 };
 
-const getExportCsv = async (
-  app: ReturnType<typeof createTestApp>['app'],
-  sessionId: string,
-) => {
-  const response = await app.request(`/sessions/${sessionId}/logs/export.csv`);
-
-  return {
-    status: response.status,
-    text: await response.text(),
-    headers: response.headers,
-  };
-};
-
 describe('フルゲーム統合テスト', () => {
   it('2人プレイでゲームを終了し結果を取得できる', async () => {
     const { app } = createTestApp();
@@ -245,14 +226,6 @@ describe('フルゲーム統合テスト', () => {
 
     expect(results.status).toBe(200);
     expect(results.payload.final_results.placements).toHaveLength(2);
-    expect(results.payload.event_log.length).toBeGreaterThan(0);
-
-    // CSV エクスポート
-    const csv = await getExportCsv(app, session.session_id);
-
-    expect(csv.status).toBe(200);
-    expect(csv.text).toContain('id,');
-    expect(csv.headers.get('content-disposition')).toContain('attachment');
   });
 
   it('4人プレイでゲームを終了し正しい順位が計算される', async () => {
@@ -448,160 +421,6 @@ describe('フルゲーム統合テスト', () => {
     expect(retryResult.status).toBe(200);
   });
 
-  it('SSE 再接続時に Last-Event-ID を使用してイベントを再送できる', async () => {
-    const { app } = createTestApp();
-    const players = [
-      { id: 'alice', display_name: 'Alice' },
-      { id: 'bob', display_name: 'Bob' },
-    ];
-
-    const session = await postSession(app, players, 'sse-reconnect-test');
-
-    // 最初の SSE 接続
-    const firstResponse = await app.request(
-      `/sessions/${session.session_id}/stream`,
-    );
-
-    expect(firstResponse.status).toBe(200);
-    expect(firstResponse.body).not.toBeNull();
-
-    const firstReader = createSseReader(firstResponse.body!);
-
-    // 初期イベント (state.delta) を取得
-    // join 時のイベントも履歴にあるため、setup/running フェーズの state.delta を探す
-    let initialStateData: SessionResponse | null = null;
-
-    while (true) {
-      const event = await firstReader.readEvent();
-
-      if (!event) {
-        throw new Error('Expected state.delta event not found');
-      }
-
-      if (event.event === 'state.delta') {
-        const data = JSON.parse(event.data) as SessionResponse;
-
-        if (data.state.phase === 'setup' || data.state.phase === 'running') {
-          initialStateData = data;
-
-          break;
-        }
-      }
-    }
-
-    expect(initialStateData).not.toBeNull();
-    const currentVersion = initialStateData.state_version;
-    const firstPlayerId = initialStateData.state.turnState.currentPlayerId;
-
-    // アクションを実行してイベントを生成
-    const actionResult = await postAction(
-      app,
-      session.session_id,
-      'cmd-sse-1',
-      currentVersion,
-      firstPlayerId,
-      'placeChip',
-    );
-
-    expect(actionResult.status).toBe(200);
-
-    // アクション後の event.log を受信（他のイベントをスキップ）
-    let logEvent: SseEvent | null = null;
-
-    for (let i = 0; i < 20; i += 1) {
-      const event = await firstReader.readEvent();
-
-      if (!event) {
-        break;
-      }
-
-      if (event.event === 'event.log') {
-        logEvent = event;
-
-        break;
-      }
-    }
-
-    expect(logEvent).not.toBeNull();
-    expect(logEvent?.id).toBeTruthy();
-
-    const logEventId = logEvent!.id;
-
-    // 接続を終了
-    await firstReader.cancel();
-
-    // 2つ目のアクションを実行
-    const secondPlayerId = actionResult.payload.state.turnState.currentPlayerId;
-    const secondActionResult = await postAction(
-      app,
-      session.session_id,
-      'cmd-sse-2',
-      actionResult.payload.state_version,
-      secondPlayerId,
-      'placeChip',
-    );
-
-    expect(secondActionResult.status).toBe(200);
-
-    // Last-Event-ID を使用して再接続
-    const reconnectResponse = await app.request(
-      `/sessions/${session.session_id}/stream`,
-      {
-        headers: {
-          'last-event-id': logEventId,
-        },
-      },
-    );
-
-    expect(reconnectResponse.status).toBe(200);
-
-    const reconnectReader = createSseReader(reconnectResponse.body!);
-
-    // 再接続後にイベントを収集して event.log を確認
-    // 非同期で書き込まれる event.log を待つため、タイムアウト付きで収集
-    const collectedEvents: SseEvent[] = [];
-    let foundReplayedLog = false;
-
-    const readWithTimeout = async (
-      timeoutMs: number,
-    ): Promise<SseEvent | null> => {
-      const timeoutPromise = new Promise<null>((resolve) =>
-        setTimeout(() => resolve(null), timeoutMs),
-      );
-
-      return Promise.race([reconnectReader.readEvent(), timeoutPromise]);
-    };
-
-    for (let i = 0; i < 30; i += 1) {
-      const event = await readWithTimeout(100);
-
-      if (!event) {
-        continue; // タイムアウトした場合は続行（まだイベントが来る可能性がある）
-      }
-
-      collectedEvents.push(event);
-
-      // event.log を見つけたら、それが Last-Event-ID 以降のものか確認
-      if (event.event === 'event.log' && event.id !== logEventId) {
-        foundReplayedLog = true;
-
-        break;
-      }
-    }
-
-    await reconnectReader.cancel();
-
-    // 再接続時に state.delta が送信されていることを確認
-    const stateEvents = collectedEvents.filter(
-      (e) => e.event === 'state.delta',
-    );
-
-    expect(stateEvents.length).toBeGreaterThan(0);
-
-    // Last-Event-ID 以降のイベントログが再送されていることを確認
-    expect(foundReplayedLog).toBe(true);
-  });
-
   it('SSE 接続中にゲーム終了まで進めると state.final イベントを受信できる', async () => {
     const { app } = createTestApp();
     const players = [
@@ -694,8 +513,7 @@ describe('フルゲーム統合テスト', () => {
 
     await sseReader.cancel();
 
-    // イベントログとステート更新イベントが受信されていることを確認
-    expect(receivedEventTypes).toContain('event.log');
+    // ステート更新イベントが受信されていることを確認
     expect(receivedEventTypes).toContain('state.delta');
     expect(receivedFinalEvent).toBe(true);
   });

@@ -65,22 +65,10 @@ describe('GET /sessions/:id/results', () => {
       maxPlayers: 2,
     };
     store.saveSnapshot(snapshot);
-    store.appendEventLog(snapshot.sessionId, [
-      {
-        id: 'turn-1-log-1',
-        turn: 1,
-        actor: 'alice',
-        action: 'placeChip',
-        timestamp: '2025-01-01T00:00:01.000Z',
-      },
-    ]);
 
     type ResultsResponse = {
       session_id: string;
       final_results: ScoreSummary;
-      event_log: {
-        id: string;
-      }[];
     };
 
     const response = await app.request('/sessions/session-x/results');
@@ -89,7 +77,6 @@ describe('GET /sessions/:id/results', () => {
     const payload = (await response.json()) as ResultsResponse;
     expect(payload.session_id).toBe('session-x');
     expect(payload.final_results).toEqual(sampleResults);
-    expect(payload.event_log).toHaveLength(1);
   });
 
   it('結果が未確定のセッションには 409 を返す', async () => {

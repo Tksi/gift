@@ -117,40 +117,11 @@ export const sessionActionResponseSchema = sessionResponseSchema.extend({
     }),
 });
 
-export const eventLogEntrySchema = z
-  .object({
-    id: z.string().openapi({
-      description: 'イベントログのユニーク ID。',
-    }),
-    turn: z.number().int().min(0).openapi({
-      description: 'イベントが発生したターン番号。',
-    }),
-    actor: z.string().openapi({
-      description: 'アクションを行ったプレイヤーまたはシステム識別子。',
-    }),
-    action: z.string().openapi({
-      description: '実行されたアクション名。',
-    }),
-    timestamp: z.string().openapi({
-      description: 'ISO 8601 形式の記録時刻。',
-    }),
-    chipsDelta: z.number().optional().openapi({
-      description: 'チップ増減がある場合、その差分値。',
-    }),
-    details: z.record(z.string(), z.unknown()).optional().openapi({
-      description: '任意の追加メタデータ。',
-    }),
-  })
-  .openapi({ description: 'イベントログ行。' });
-
 export const sessionResultsResponseSchema = z.object({
   session_id: z.string().openapi({
     description: '対象セッションの ID。',
   }),
   final_results: scoreSummarySchema.openapi({
     description: '最終スコアと順位情報。',
-  }),
-  event_log: z.array(eventLogEntrySchema).openapi({
-    description: 'ターン順に並んだイベントログ。',
   }),
 });

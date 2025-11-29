@@ -170,9 +170,8 @@ export const sessionRematchPostApp = new OpenAPIHono<SessionEnv>().openapi(
       gameSnapshot.turnState.deadline = null;
     }
 
-    // コマンドID履歴と旧イベントログをクリア
+    // コマンドID履歴をクリア
     envelope.processedCommands.clear();
-    envelope.eventLog.length = 0;
 
     const updatedEnvelope = deps.store.saveSnapshot(gameSnapshot);
 

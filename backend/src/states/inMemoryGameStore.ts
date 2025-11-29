@@ -20,16 +20,6 @@ export type GameSnapshot = z.infer<typeof snapshotSchema>;
 
 export type ScoreSummary = z.infer<typeof scoreSummarySchema>;
 
-export type EventLogEntry = {
-  id: string;
-  turn: number;
-  actor: string;
-  action: string;
-  timestamp: string;
-  chipsDelta?: number;
-  details?: Record<string, unknown>;
-};
-
 export type Mutex = {
   runExclusive: <T>(task: () => Promise<T> | T) => Promise<T>;
 };
@@ -37,7 +27,6 @@ export type Mutex = {
 export type SessionEnvelope = {
   version: string;
   snapshot: GameSnapshot;
-  eventLog: EventLogEntry[];
   processedCommands: Set<string>;
   mutex: Mutex;
   deadlineHandle?: TimerHandle;
@@ -55,11 +44,6 @@ export type InMemoryGameStore = {
   saveSnapshot: (snapshot: GameSnapshot) => SessionEnvelope;
   getSnapshot: (sessionId: string) => GameSnapshot | undefined;
   getEnvelope: (sessionId: string) => SessionEnvelope | undefined;
-  appendEventLog: (
-    sessionId: string,
-    entries: readonly EventLogEntry[],
-  ) => EventLogEntry[];
-  listEventLogAfter: (sessionId: string, afterId?: string) => EventLogEntry[];
   hasProcessedCommand: (sessionId: string, commandId: string) => boolean;
   markCommandProcessed: (sessionId: string, commandId: string) => void;
   listSessions: () => SessionSummary[];
@@ -131,7 +115,6 @@ export const createInMemoryGameStore = (): InMemoryGameStore => {
     const created: SessionEnvelope = {
       snapshot: normalizedSnapshot,
       version,
-      eventLog: [],
       processedCommands: new Set<string>(),
       mutex: createMutex(),
     };
@@ -153,39 +136,6 @@ export const createInMemoryGameStore = (): InMemoryGameStore => {
 
   const getEnvelope = (sessionId: string): SessionEnvelope | undefined =>
     sessions.get(sessionId);
-
-  const appendEventLog = (
-    sessionId: string,
-    entries: readonly EventLogEntry[],
-  ): EventLogEntry[] => {
-    const envelope = ensureEnvelope(sessions, sessionId);
-    const normalized = entries.map((entry) => cloneValue(entry));
-
-    for (const entry of normalized) {
-      envelope.eventLog.push(entry);
-    }
-
-    return normalized;
-  };
-
-  const listEventLogAfter = (
-    sessionId: string,
-    afterId?: string,
-  ): EventLogEntry[] => {
-    const envelope = ensureEnvelope(sessions, sessionId);
-
-    if (afterId === undefined) {
-      return envelope.eventLog.map((entry) => cloneValue(entry));
-    }
-
-    const index = envelope.eventLog.findIndex((entry) => entry.id === afterId);
-
-    if (index === -1) {
-      return envelope.eventLog.map((entry) => cloneValue(entry));
-    }
-
-    return envelope.eventLog.slice(index + 1).map((entry) => cloneValue(entry));
-  };
 
   const hasProcessedCommand = (
     sessionId: string,
@@ -234,8 +184,6 @@ export const createInMemoryGameStore = (): InMemoryGameStore => {
     saveSnapshot,
     getSnapshot,
     getEnvelope,
-    appendEventLog,
-    listEventLogAfter,
     hasProcessedCommand,
     markCommandProcessed,
     listSessions,
