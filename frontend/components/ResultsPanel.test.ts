@@ -57,35 +57,51 @@ const createTestResults = (
   ...override,
 });
 
+/**
+ * テスト用プレイヤーマップを作成する
+ */
+const createTestPlayerMap = (
+  override: Record<string, string> = {},
+): Record<string, string> => ({
+  player1: 'プレイヤー1',
+  player2: 'プレイヤー2',
+  player3: 'プレイヤー3',
+  ...override,
+});
+
 describe('ResultsPanel', () => {
   describe('プレイヤー順位表示', () => {
-    it('順位、プレイヤーID、スコアを表示する', () => {
+    it('順位、プレイヤー名、スコアを表示する', () => {
       const results = createTestResults();
+      const playerMap = createTestPlayerMap();
       const wrapper = mount(ResultsPanel, {
         props: {
           results,
+          playerMap,
         },
       });
 
-      // 各プレイヤーの情報が表示されていることを確認
+      // 各プレイヤーの情報が表示されていることを確認（表示名で確認）
       expect(wrapper.text()).toContain('1位');
-      expect(wrapper.text()).toContain('player1');
+      expect(wrapper.text()).toContain('プレイヤー1');
       expect(wrapper.text()).toContain('15');
 
       expect(wrapper.text()).toContain('2位');
-      expect(wrapper.text()).toContain('player2');
+      expect(wrapper.text()).toContain('プレイヤー2');
       expect(wrapper.text()).toContain('25');
 
       expect(wrapper.text()).toContain('3位');
-      expect(wrapper.text()).toContain('player3');
+      expect(wrapper.text()).toContain('プレイヤー3');
       expect(wrapper.text()).toContain('35');
     });
 
     it('残りチップ数を表示する', () => {
       const results = createTestResults();
+      const playerMap = createTestPlayerMap();
       const wrapper = mount(ResultsPanel, {
         props: {
           results,
+          playerMap,
         },
       });
 
@@ -107,9 +123,11 @@ describe('ResultsPanel', () => {
         ],
         tieBreak: null,
       });
+      const playerMap = createTestPlayerMap();
       const wrapper = mount(ResultsPanel, {
         props: {
           results,
+          playerMap,
         },
       });
 
@@ -123,9 +141,11 @@ describe('ResultsPanel', () => {
   describe('勝者ハイライト', () => {
     it('1位のプレイヤーがハイライト表示される', () => {
       const results = createTestResults();
+      const playerMap = createTestPlayerMap();
       const wrapper = mount(ResultsPanel, {
         props: {
           results,
+          playerMap,
         },
       });
 
@@ -137,9 +157,11 @@ describe('ResultsPanel', () => {
 
     it('2位以降のプレイヤーはハイライト表示されない', () => {
       const results = createTestResults();
+      const playerMap = createTestPlayerMap();
       const wrapper = mount(ResultsPanel, {
         props: {
           results,
+          playerMap,
         },
       });
 
@@ -151,7 +173,7 @@ describe('ResultsPanel', () => {
   });
 
   describe('タイブレーク情報', () => {
-    it('タイブレークがある場合、その情報を表示する', () => {
+    it('タイブレークがある場合、その情報を表示名で表示する', () => {
       const results = createTestResults({
         tieBreak: {
           reason: 'chipCount',
@@ -160,24 +182,28 @@ describe('ResultsPanel', () => {
           winner: 'player1',
         },
       });
+      const playerMap = createTestPlayerMap();
       const wrapper = mount(ResultsPanel, {
         props: {
           results,
+          playerMap,
         },
       });
 
-      // タイブレーク情報の表示を確認
+      // タイブレーク情報の表示を確認（表示名で確認）
       expect(wrapper.text()).toContain('同点');
       expect(wrapper.text()).toContain('20');
-      expect(wrapper.text()).toContain('player1');
-      expect(wrapper.text()).toContain('player2');
+      expect(wrapper.text()).toContain('プレイヤー1');
+      expect(wrapper.text()).toContain('プレイヤー2');
     });
 
     it('タイブレークがない場合、タイブレーク情報を表示しない', () => {
       const results = createTestResults({ tieBreak: null });
+      const playerMap = createTestPlayerMap();
       const wrapper = mount(ResultsPanel, {
         props: {
           results,
+          playerMap,
         },
       });
 
@@ -196,9 +222,11 @@ describe('ResultsPanel', () => {
           winner: null,
         },
       });
+      const playerMap = createTestPlayerMap();
       const wrapper = mount(ResultsPanel, {
         props: {
           results,
+          playerMap,
         },
       });
 
@@ -210,9 +238,11 @@ describe('ResultsPanel', () => {
   describe('新しいゲームボタン', () => {
     it('新しいゲームを開始するボタンが表示される', () => {
       const results = createTestResults();
+      const playerMap = createTestPlayerMap();
       const wrapper = mount(ResultsPanel, {
         props: {
           results,
+          playerMap,
         },
       });
 
@@ -223,9 +253,11 @@ describe('ResultsPanel', () => {
 
     it('ボタンクリックで newGame イベントが発火する', async () => {
       const results = createTestResults();
+      const playerMap = createTestPlayerMap();
       const wrapper = mount(ResultsPanel, {
         props: {
           results,
+          playerMap,
         },
       });
 
@@ -239,9 +271,11 @@ describe('ResultsPanel', () => {
   describe('タッチ操作対応', () => {
     it('新しいゲームボタンは最小 44px の高さを持つ', () => {
       const results = createTestResults();
+      const playerMap = createTestPlayerMap();
       const wrapper = mount(ResultsPanel, {
         props: {
           results,
+          playerMap,
         },
       });
 

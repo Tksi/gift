@@ -159,4 +159,63 @@ describe('HintPanel', () => {
       expect(wrapper.find('[data-testid="hint-loading"]').exists()).toBe(false);
     });
   });
+
+  describe('プレイヤー名変換', () => {
+    it('playerMap がある場合、ヒントテキスト内のプレイヤーIDを表示名に変換する', () => {
+      const hint = createTestHint({
+        text: 'player1 はカード 5 を取得できます。player2 は支払いを選択しました。',
+      });
+      const playerMap = {
+        player1: 'たろう',
+        player2: 'はなこ',
+      };
+      const wrapper = mount(HintPanel, {
+        props: {
+          hint,
+          isVisible: true,
+          isLoading: false,
+          playerMap,
+        },
+      });
+
+      // プレイヤーIDではなく表示名が表示されていることを確認
+      expect(wrapper.text()).toContain('たろう');
+      expect(wrapper.text()).toContain('はなこ');
+      expect(wrapper.text()).not.toContain('player1');
+      expect(wrapper.text()).not.toContain('player2');
+    });
+
+    it('playerMap がない場合、ヒントテキストをそのまま表示する', () => {
+      const hint = createTestHint({
+        text: 'player1 はカード 5 を取得できます。',
+      });
+      const wrapper = mount(HintPanel, {
+        props: {
+          hint,
+          isVisible: true,
+          isLoading: false,
+        },
+      });
+
+      // プレイヤーIDがそのまま表示される
+      expect(wrapper.text()).toContain('player1');
+    });
+
+    it('playerMap が空の場合、ヒントテキストをそのまま表示する', () => {
+      const hint = createTestHint({
+        text: 'player1 はカード 5 を取得できます。',
+      });
+      const wrapper = mount(HintPanel, {
+        props: {
+          hint,
+          isVisible: true,
+          isLoading: false,
+          playerMap: {},
+        },
+      });
+
+      // プレイヤーIDがそのまま表示される
+      expect(wrapper.text()).toContain('player1');
+    });
+  });
 });

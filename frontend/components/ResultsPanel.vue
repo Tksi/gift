@@ -22,9 +22,14 @@ type GameResults = {
   tieBreak: TieBreak | null;
 };
 
+/** プレイヤーIDと表示名のマッピング */
+type PlayerMap = Record<string, string>;
+
 type Props = {
   /** 最終結果 */
   results: GameResults;
+  /** プレイヤーIDから表示名へのマッピング */
+  playerMap: PlayerMap;
 };
 
 const props = defineProps<Props>();
@@ -33,6 +38,15 @@ const emit = defineEmits<{
   /** 新しいゲームを開始 */
   newGame: [];
 }>();
+
+/**
+ * プレイヤーIDを表示名に変換する
+ * @param playerId - プレイヤーID
+ * @returns 表示名（マッピングがない場合はIDをそのまま返す）
+ */
+const getDisplayName = (playerId: string): string => {
+  return props.playerMap[playerId] ?? playerId;
+};
 
 /**
  * カードセットを表示用文字列に変換する
@@ -122,7 +136,9 @@ const handleNewGame = (): void => {
                 🏆
               </span>
             </td>
-            <td class="pr-4 py-3 text-gray-900">{{ placement.playerId }}</td>
+            <td class="pr-4 py-3 text-gray-900">
+              {{ getDisplayName(placement.playerId) }}
+            </td>
             <td class="font-medium pr-4 py-3 text-gray-900 text-right">
               {{ placement.score }}
             </td>
@@ -154,7 +170,7 @@ const handleNewGame = (): void => {
       <h3 class="font-medium mb-1 text-gray-800 text-sm">同点タイブレーク</h3>
       <p class="text-gray-600 text-sm">
         スコア {{ results.tieBreak.tiedScore }} で同点:
-        {{ results.tieBreak.contenders.join(', ') }}
+        {{ results.tieBreak.contenders.map(getDisplayName).join(', ') }}
       </p>
       <p v-if="isTieDraw" class="font-medium mt-1 text-amber-600 text-sm">
         チップ数も同じのため引き分け
@@ -163,7 +179,7 @@ const handleNewGame = (): void => {
         v-else-if="results.tieBreak.winner"
         class="font-medium mt-1 text-green-600 text-sm"
       >
-        チップ数が多い {{ results.tieBreak.winner }} が勝利
+        チップ数が多い {{ getDisplayName(results.tieBreak.winner) }} が勝利
       </p>
     </div>
 

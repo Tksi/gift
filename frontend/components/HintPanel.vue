@@ -8,6 +8,9 @@ type RuleHint = {
   generated_at: string;
 };
 
+/** プレイヤーIDと表示名のマッピング */
+type PlayerMap = Record<string, string>;
+
 type Props = {
   /** ヒント情報 */
   hint: RuleHint | null;
@@ -15,6 +18,8 @@ type Props = {
   isVisible: boolean;
   /** ローディング状態 */
   isLoading: boolean;
+  /** プレイヤーIDから表示名へのマッピング */
+  playerMap?: PlayerMap;
 };
 
 const props = defineProps<Props>();
@@ -23,6 +28,27 @@ const emit = defineEmits<{
   /** 表示トグル */
   toggle: [];
 }>();
+
+/**
+ * ヒントテキスト内のプレイヤーIDを表示名に変換する
+ * @returns プレイヤー名が変換されたヒントテキスト
+ */
+const formattedHintText = computed((): string => {
+  if (!props.hint) return '';
+
+  if (!props.playerMap || Object.keys(props.playerMap).length === 0) {
+    return props.hint.text;
+  }
+
+  // playerMap のキー（playerId）をテキスト内で検索し、表示名に置換する
+  let text = props.hint.text;
+
+  for (const [playerId, displayName] of Object.entries(props.playerMap)) {
+    text = text.replaceAll(playerId, displayName);
+  }
+
+  return text;
+});
 
 /** トグルボタンのラベル */
 const toggleLabel = computed((): string => {
@@ -105,7 +131,7 @@ const handleToggle = (): void => {
       data-testid="hint-container"
     >
       <p class="text-gray-700 text-sm" data-testid="hint-text">
-        {{ hint.text }}
+        {{ formattedHintText }}
       </p>
     </div>
   </div>

@@ -398,6 +398,21 @@ const players = computed((): PlayerDisplayData[] => {
   }));
 });
 
+/** プレイヤーIDから表示名へのマッピング */
+const playerMap = computed((): Record<string, string> => {
+  const state = gameState.value;
+
+  if (state === null) return {};
+
+  const map: Record<string, string> = {};
+
+  for (const player of state.players) {
+    map[player.id] = player.displayName;
+  }
+
+  return map;
+});
+
 /** 完了状態かどうか */
 const isCompleted = computed(
   (): boolean => gamePhase.value === 'completed' && results.value !== null,
@@ -592,6 +607,7 @@ watch(sessionId, (newSessionId, oldSessionId) => {
           :hint="hint"
           :is-loading="isHintLoading"
           :is-visible="isHintVisible"
+          :player-map="playerMap"
           @toggle="() => handleHintToggle()"
         />
       </template>
@@ -599,6 +615,7 @@ watch(sessionId, (newSessionId, oldSessionId) => {
       <!-- 結果画面 -->
       <ResultsPanel
         v-else-if="isCompleted && results"
+        :player-map="playerMap"
         :results="results"
         @new-game="() => handleNewGame()"
       />
