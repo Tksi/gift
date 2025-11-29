@@ -150,26 +150,6 @@ describe('MonitoringService', () => {
     });
   });
 
-  describe('logSystemTimeout', () => {
-    it('強制取得イベントを監査ログに記録する', () => {
-      service.logSystemTimeout({
-        sessionId: 'session-1',
-        turn: 7,
-        forcedPlayerId: 'player-3',
-        cardTaken: 28,
-      });
-
-      expect(mockLogger).toHaveBeenCalledWith({
-        level: 'info',
-        event: 'system_timeout',
-        sessionId: 'session-1',
-        turn: 7,
-        forcedPlayerId: 'player-3',
-        cardTaken: 28,
-      });
-    });
-  });
-
   describe('logExport', () => {
     it('エクスポート成功を監査ログに記録する', () => {
       service.logExport({

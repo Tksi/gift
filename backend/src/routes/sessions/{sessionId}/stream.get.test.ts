@@ -168,7 +168,7 @@ const createSession = async () => {
 };
 
 describe('GET /sessions/{sessionId}/stream', () => {
-  it('最新状態を state.delta と rule.hint イベントとして送信する', async () => {
+  it('最新状態を state.delta イベントとして送信する', async () => {
     const { app, session } = await createSession();
     const response = await app.request(
       `/sessions/${session.session_id}/stream`,
@@ -213,20 +213,6 @@ describe('GET /sessions/{sessionId}/stream', () => {
     expect(data.session_id).toBe(session.session_id);
     // state_version は SSE 接続時の最新版なので存在確認のみ
     expect(data.state_version).toBeTruthy();
-
-    const hintEvent = await readNextDataEvent(reader);
-
-    expect(hintEvent).not.toBeNull();
-
-    if (!hintEvent) {
-      return;
-    }
-
-    expect(hintEvent.event).toBe('rule.hint');
-    const hintPayload = JSON.parse(hintEvent.data) as {
-      hint: { text: string };
-    };
-    expect(hintPayload.hint.text).toContain('カード');
     await reader.cancel();
   });
 
@@ -266,9 +252,6 @@ describe('GET /sessions/{sessionId}/stream', () => {
 
     expect(initialState).not.toBeNull();
     const currentVersion = initialState.state_version;
-
-    await readNextDataEvent(reader); // rule.hint を読み飛ばす
-
     const actorId = initialState.state.turnState.currentPlayerId;
 
     const actionResponse = await app.request(
@@ -317,16 +300,6 @@ describe('GET /sessions/{sessionId}/stream', () => {
     expect(stateEvent.event).toBe('state.delta');
     const data = JSON.parse(stateEvent.data) as SessionResponse;
     expect(data.state_version).not.toBe(session.state_version);
-
-    const hintEvent = await readNextDataEvent(reader);
-
-    expect(hintEvent).not.toBeNull();
-
-    if (!hintEvent) {
-      return;
-    }
-
-    expect(hintEvent.event).toBe('rule.hint');
     await reader.cancel();
   });
 

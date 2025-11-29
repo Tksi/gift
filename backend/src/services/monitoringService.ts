@@ -33,13 +33,6 @@ type TimerEventParams = {
   turn?: number;
 };
 
-type SystemTimeoutParams = {
-  sessionId: string;
-  turn: number;
-  forcedPlayerId: string;
-  cardTaken: number;
-};
-
 type ExportParams = {
   sessionId: string;
   format: 'csv' | 'json';
@@ -57,7 +50,6 @@ export type MonitoringService = {
   logMutexWait: (params: MutexWaitParams) => void;
   logSseConnectionChange: (params: SseConnectionChangeParams) => void;
   logTimerEvent: (params: TimerEventParams) => void;
-  logSystemTimeout: (params: SystemTimeoutParams) => void;
   logExport: (params: ExportParams) => void;
   logSessionEvent: (params: SessionEventParams) => void;
 };
@@ -131,17 +123,6 @@ export const createMonitoringService = (
     dependencies.log(entry);
   };
 
-  const logSystemTimeout = (params: SystemTimeoutParams): void => {
-    dependencies.log({
-      level: 'info',
-      event: 'system_timeout',
-      sessionId: params.sessionId,
-      turn: params.turn,
-      forcedPlayerId: params.forcedPlayerId,
-      cardTaken: params.cardTaken,
-    });
-  };
-
   const logExport = (params: ExportParams): void => {
     dependencies.log({
       level: 'info',
@@ -172,7 +153,6 @@ export const createMonitoringService = (
     logMutexWait,
     logSseConnectionChange,
     logTimerEvent,
-    logSystemTimeout,
     logExport,
     logSessionEvent,
   };

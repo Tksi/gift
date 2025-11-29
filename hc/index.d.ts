@@ -1525,12 +1525,6 @@ type TimerEventParams = {
   deadline?: string;
   turn?: number;
 };
-type SystemTimeoutParams = {
-  sessionId: string;
-  turn: number;
-  forcedPlayerId: string;
-  cardTaken: number;
-};
 type ExportParams = {
   sessionId: string;
   format: 'csv' | 'json';
@@ -1546,7 +1540,6 @@ type MonitoringService = {
   logMutexWait: (params: MutexWaitParams) => void;
   logSseConnectionChange: (params: SseConnectionChangeParams) => void;
   logTimerEvent: (params: TimerEventParams) => void;
-  logSystemTimeout: (params: SystemTimeoutParams) => void;
   logExport: (params: ExportParams) => void;
   logSessionEvent: (params: SessionEventParams) => void;
 };
@@ -3429,24 +3422,6 @@ type InMemoryGameStore = {
   pruneSessionsOlderThan: (olderThan: Date) => string[];
 };
 //#endregion
-//#region src/services/ruleHintService.d.ts
-type RuleHintEmphasis = 'info' | 'warning';
-type RuleHint = {
-  text: string;
-  emphasis: RuleHintEmphasis;
-  turn: number;
-  generatedAt: string;
-};
-type StoredRuleHint = {
-  sessionId: string;
-  stateVersion: string;
-  hint: RuleHint;
-};
-type RuleHintService = {
-  refreshHint: (snapshot: GameSnapshot, version: string) => StoredRuleHint;
-  getLatestHint: (sessionId: string) => StoredRuleHint | null;
-};
-//#endregion
 //#region src/services/sseBroadcastGateway.d.ts
 type SseEventPayload = {
   id: string;
@@ -3466,10 +3441,6 @@ type SseBroadcastGateway = {
   publishStateFinal: (sessionId: string, snapshot: GameSnapshot, version: string) => void;
   publishSystemError: (sessionId: string, payload: ErrorDetail) => void;
   publishEventLog: (sessionId: string, entry: EventLogEntry) => void;
-  publishRuleHint: (sessionId: string, payload: {
-    stateVersion: string;
-    hint: RuleHint;
-  }) => void;
 };
 //#endregion
 //#region src/services/eventLogService.d.ts
@@ -3544,7 +3515,6 @@ type SessionRouteDependencies = {
   turnTimeoutMs: number;
   sseGateway: SseBroadcastGateway;
   eventLogService: EventLogService;
-  ruleHintService: RuleHintService;
   monitoring?: MonitoringService;
 };
 /**
@@ -3565,7 +3535,6 @@ type CreateAppOptions = {
   turnTimeoutMs?: number;
   sseGateway?: SseBroadcastGateway;
   eventLogService?: EventLogService;
-  ruleHintService?: RuleHintService;
   monitoring?: MonitoringService;
 };
 /**
@@ -4196,45 +4165,6 @@ declare const createApp: (options?: CreateAppOptions) => Hono$1<SessionEnv, Merg
       };
       output: {};
       outputFormat: string;
-      status: 200;
-    };
-  };
-}, "/"> & MergeSchemaPath<{
-  "/sessions/:sessionId/hint": {
-    $get: {
-      input: {
-        param: {
-          sessionId: string;
-        };
-      };
-      output: {
-        error: {
-          code: string;
-          message: string;
-          reason_code: string;
-          instruction: string;
-        };
-      };
-      outputFormat: "json";
-      status: 404;
-    } | {
-      input: {
-        param: {
-          sessionId: string;
-        };
-      };
-      output: {
-        session_id: string;
-        state_version: string;
-        generated_from_version: string;
-        hint: {
-          text: string;
-          emphasis: "info" | "warning";
-          turn: number;
-          generated_at: string;
-        };
-      };
-      outputFormat: "json";
       status: 200;
     };
   };

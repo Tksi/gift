@@ -8,7 +8,7 @@ export type TimerSupervisorDependencies = {
   now: () => number;
   schedule: (handler: () => void, delayMs: number) => TimerHandle;
   cancel: (handle: TimerHandle) => void;
-  onTimeout: (sessionId: string) => Promise<void> | void;
+  onTimeout?: (sessionId: string) => Promise<void> | void;
   monitoring?: MonitoringService;
 };
 
@@ -107,7 +107,7 @@ export const createTimerSupervisor = (
     const handle = dependencies.schedule(() => {
       delete envelope.deadlineHandle;
       delete envelope.deadlineAt;
-      void dependencies.onTimeout(sessionId);
+      void dependencies.onTimeout?.(sessionId);
     }, delay);
 
     envelope.deadlineHandle = handle;

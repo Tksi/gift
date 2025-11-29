@@ -149,14 +149,6 @@ onUnmounted(() => {
         <h1 class="font-bold text-3xl text-gray-900">Gift</h1>
       </div>
 
-      <!-- ルーム作成 -->
-      <div class="bg-white mb-6 p-6 rounded-xl shadow-md">
-        <SessionForm
-          :is-submitting="isSubmitting"
-          @submit="() => handleSubmit()"
-        />
-      </div>
-
       <!-- ルーム一覧 -->
       <div class="bg-white p-6 rounded-xl shadow-md">
         <h2 class="font-bold mb-4 text-gray-800 text-lg">参加可能なルーム</h2>
@@ -194,6 +186,14 @@ onUnmounted(() => {
             </button>
           </li>
         </ul>
+      </div>
+
+      <!-- ルーム作成 -->
+      <div class="bg-white mt-6 p-6 rounded-xl shadow-md">
+        <SessionForm
+          :is-submitting="isSubmitting"
+          @submit="() => handleSubmit()"
+        />
       </div>
     </div>
 

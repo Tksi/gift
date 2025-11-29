@@ -467,7 +467,7 @@ describe('フルゲーム統合テスト', () => {
 
     const firstReader = createSseReader(firstResponse.body!);
 
-    // 初期イベント (state.delta と rule.hint) を取得
+    // 初期イベント (state.delta) を取得
     // join 時のイベントも履歴にあるため、setup/running フェーズの state.delta を探す
     let initialStateData: SessionResponse | null = null;
 
@@ -492,11 +492,6 @@ describe('フルゲーム統合テスト', () => {
     expect(initialStateData).not.toBeNull();
     const currentVersion = initialStateData.state_version;
     const firstPlayerId = initialStateData.state.turnState.currentPlayerId;
-
-    // rule.hint を取得
-    const initialHint = await firstReader.readEvent();
-
-    expect(initialHint?.event).toBe('rule.hint');
 
     // アクションを実行してイベントを生成
     const actionResult = await postAction(
@@ -625,9 +620,8 @@ describe('フルゲーム統合テスト', () => {
 
     const sseReader = createSseReader(sseResponse.body!);
 
-    // 初期イベントをスキップ
+    // 初期イベント (state.delta) をスキップ
     await sseReader.readEvent(); // state.delta
-    await sseReader.readEvent(); // rule.hint
 
     // ゲームを終了まで進める
     let commandIndex = 0;

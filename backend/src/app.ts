@@ -27,7 +27,6 @@ import {
   type SseBroadcastGateway,
   createSseBroadcastGateway,
 } from 'services/sseBroadcastGateway.js';
-import { createTimeoutCommandHandler } from 'services/systemTimeoutHandler.js';
 import {
   type TimerSupervisor,
   createTimerSupervisor,
@@ -59,8 +58,6 @@ const defaultLogger = (entry: Record<string, unknown>): void => {
   console.info(JSON.stringify(entry));
 };
 
-const noopTimeoutHandler = (): void => undefined;
-
 /**
  * 共通ミドルウェアやドキュメント、ルートをまとめた API アプリケーションを構築する。
  * @param options ストアやクロック、ID 生成器などを差し替えるためのオプション。
@@ -80,8 +77,6 @@ export const createApp = (options: CreateAppOptions = {}) => {
       store,
       sseGateway,
     });
-  let timeoutHandler: (sessionId: string) => Promise<void> | void =
-    noopTimeoutHandler;
   const timerSupervisor =
     options.timerSupervisor ??
     createTimerSupervisor({
@@ -89,7 +84,6 @@ export const createApp = (options: CreateAppOptions = {}) => {
       now: () => Date.now(),
       schedule: (handler, delay) => setTimeout(handler, delay),
       cancel: (handle) => clearTimeout(handle),
-      onTimeout: (sessionId) => timeoutHandler(sessionId),
       monitoring,
     });
 
@@ -101,15 +95,6 @@ export const createApp = (options: CreateAppOptions = {}) => {
     eventLogs: eventLogService,
     monitoring,
   });
-
-  if (options.timerSupervisor === undefined) {
-    timeoutHandler = createTimeoutCommandHandler({
-      store,
-      turnService,
-      sseGateway,
-      monitoring,
-    });
-  }
 
   const sessionDependencies: SessionRouteDependencies = {
     store,
