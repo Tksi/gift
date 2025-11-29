@@ -40,8 +40,8 @@ export type UseSseOptions = {
  * useSse の戻り値
  */
 export type UseSseReturn = {
-  /** SSE 接続を開始 */
-  connect: (sessionId: string, playerId?: string) => void;
+  /** SSE 接続を開始（接続完了時に resolve する Promise を返す） */
+  connect: (sessionId: string, playerId?: string) => Promise<void>;
   /** SSE 接続を切断 */
   disconnect: () => void;
   /** 接続状態 */
@@ -98,6 +98,7 @@ export const useSse = (options: UseSseOptions): UseSseReturn => {
   let retryCount = 0;
   let reconnectTimeoutId: ReturnType<typeof setTimeout> | null = null;
   let wasConnected = false;
+  let connectResolve: (() => void) | null = null;
 
   /**
    * イベントをパースして onEvent コールバックに渡す
@@ -193,6 +194,12 @@ export const useSse = (options: UseSseOptions): UseSseReturn => {
       }
 
       wasConnected = true;
+
+      // connect() の Promise を resolve
+      if (connectResolve !== null) {
+        connectResolve();
+        connectResolve = null;
+      }
     });
 
     eventSource.addEventListener('error', () => {
@@ -216,18 +223,22 @@ export const useSse = (options: UseSseOptions): UseSseReturn => {
    * SSE 接続を開始する
    * @param sessionId - 接続先のセッション ID
    * @param playerId - 接続するプレイヤー ID（オプション）。指定すると切断時にロビーから自動退出
+   * @returns 接続完了時に resolve する Promise
    */
-  const connect = (sessionId: string, playerId?: string) => {
+  const connect = (sessionId: string, playerId?: string): Promise<void> => {
     // sessionId が空の場合は接続しない
     if (!sessionId) {
-      return;
+      return Promise.resolve();
     }
 
-    currentSessionId = sessionId;
-    currentPlayerId = playerId ?? null;
-    wasConnected = false;
-    retryCount = 0;
-    connectInternal(sessionId);
+    return new Promise((resolve) => {
+      connectResolve = resolve;
+      currentSessionId = sessionId;
+      currentPlayerId = playerId ?? null;
+      wasConnected = false;
+      retryCount = 0;
+      connectInternal(sessionId);
+    });
   };
 
   /**

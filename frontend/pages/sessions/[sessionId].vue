@@ -141,7 +141,7 @@ const loadInitialState = async (): Promise<void> => {
     }
 
     // SSE 接続を開始（playerIdを渡してロビーからの自動退出を有効化）
-    connectSse(sessionId.value, currentPlayerId.value ?? undefined);
+    void connectSse(sessionId.value, currentPlayerId.value ?? undefined);
 
     // 完了状態なら結果を取得
     if (result.data.state.phase === 'completed') {
@@ -273,8 +273,9 @@ const handleJoin = async (displayName: string): Promise<void> => {
     stateVersion.value = result.data.state_version;
 
     // SSE を再接続して playerId を含める（切断時の自動退出を有効化）
+    // 接続完了を待ってからローディングを解除（ちらつき防止）
     disconnectSse();
-    connectSse(sessionId.value, result.data.player.id);
+    await connectSse(sessionId.value, result.data.player.id);
   } else {
     error.value = { code: result.code, status: result.status };
   }
