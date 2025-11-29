@@ -1,14 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import type { ApiError } from '~/types/apiError';
 import { getErrorMessage } from '~/utils/errorMessages';
-
-/** API エラー情報 */
-export type ApiError = {
-  /** エラーコード */
-  code: string;
-  /** HTTP ステータスコード */
-  status: number;
-};
 
 type Props = {
   /** エラー情報 (null の場合は非表示) */

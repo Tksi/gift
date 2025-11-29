@@ -1,5 +1,5 @@
 import { fetcher } from './fetcher';
-import type { InferResponseType } from 'hono/client';
+import type { GameStateData } from './stateFetcher';
 
 /** アクション種別 */
 export type ActionType = 'placeChip' | 'takeCard';
@@ -19,10 +19,19 @@ export type SendActionParams = {
 };
 
 /** アクション成功時のレスポンスデータ（200 レスポンス） */
-export type ActionSuccessData = InferResponseType<
-  (typeof fetcher.sessions)[':sessionId']['actions']['$post'],
-  200
->;
+export type ActionSuccessData = {
+  session_id: string;
+  state_version: string;
+  state: GameStateData;
+  turn_context: {
+    turn: number;
+    current_player_id: string;
+    card_in_center: number | null;
+    awaiting_action: boolean;
+    central_pot: number;
+    chips: Record<string, number>;
+  };
+};
 
 /** アクション送信結果 */
 export type SendActionResult =
@@ -45,7 +54,7 @@ export type SendActionResult =
 
 /**
  * ゲームアクションを送信する
- * @param params アクション送信パラメータ
+ * @param params - アクション送信パラメータ
  * @returns 送信結果
  */
 export const sendAction = async (
@@ -65,13 +74,13 @@ export const sendAction = async (
     });
 
     if (response.ok) {
-      const data = await response.json();
+      const data = (await response.json()) as ActionSuccessData;
 
       return { success: true, data };
     }
 
-    const errorData = await response.json();
-    const code = 'error' in errorData ? errorData.error.code : 'UNKNOWN_ERROR';
+    const errorData = (await response.json()) as { error?: { code: string } };
+    const code = errorData.error?.code ?? 'UNKNOWN_ERROR';
 
     return {
       success: false,

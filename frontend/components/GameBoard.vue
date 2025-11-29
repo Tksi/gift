@@ -2,7 +2,7 @@
 import { computed } from 'vue';
 
 /** ゲームフェーズ */
-type GamePhase = 'completed' | 'running' | 'setup';
+type GamePhase = 'completed' | 'running' | 'setup' | 'waiting';
 
 type Props = {
   /** 中央のカード番号 (null = カードなし) */
@@ -21,7 +21,8 @@ const borderColorClass = computed((): string => {
     case 'running': {
       return 'border-blue-200';
     }
-    case 'setup': {
+    case 'setup':
+    case 'waiting': {
       return 'border-gray-300';
     }
     case 'completed': {
