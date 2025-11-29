@@ -108,9 +108,43 @@ const joinRoom = (sessionId: string): void => {
   void navigateTo(`/sessions/${sessionId}`);
 };
 
-// マウント時にルーム一覧を取得
-onMounted(() => {
+/** ポーリング間隔（ミリ秒） */
+const POLLING_INTERVAL = 3000;
+
+/** ポーリングタイマーID */
+let pollingTimer: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * ポーリング開始
+ */
+const startPolling = (): void => {
+  // 初回読み込み
   void loadRooms();
+
+  // 3秒毎にポーリング
+  pollingTimer = setInterval(() => {
+    void loadRooms();
+  }, POLLING_INTERVAL);
+};
+
+/**
+ * ポーリング停止
+ */
+const stopPolling = (): void => {
+  if (pollingTimer !== null) {
+    clearInterval(pollingTimer);
+    pollingTimer = null;
+  }
+};
+
+// マウント時にポーリング開始
+onMounted(() => {
+  startPolling();
+});
+
+// アンマウント時にポーリング停止
+onUnmounted(() => {
+  stopPolling();
 });
 </script>
 
@@ -175,15 +209,6 @@ onMounted(() => {
             </button>
           </li>
         </ul>
-
-        <!-- 更新ボタン -->
-        <button
-          class="mt-4 text-blue-600 text-sm underline"
-          :disabled="isLoadingRooms"
-          @click="() => loadRooms()"
-        >
-          {{ isLoadingRooms ? '更新中...' : '一覧を更新' }}
-        </button>
       </div>
     </div>
 
