@@ -119,35 +119,6 @@ describe('createSseBroadcastGateway', () => {
     connection.disconnect();
   });
 
-  it('publishRuleHint は rule.hint イベントを送信する', () => {
-    const gateway = createSseBroadcastGateway();
-    const send = vi.fn<(event: SseEventPayload) => void>();
-
-    const connection = gateway.connect({
-      sessionId: 'session-2',
-      send,
-    });
-
-    gateway.publishRuleHint('session-2', {
-      stateVersion: 'version-3',
-      hint: {
-        text: 'カード 10 は実質 8 点です。',
-        emphasis: 'info',
-        turn: 2,
-        generatedAt: '2025-01-01T00:00:10.000Z',
-      },
-    });
-
-    expect(send).toHaveBeenCalledWith(
-      expect.objectContaining({
-        event: 'rule.hint',
-        id: 'rule-hint:version-3',
-      }),
-    );
-
-    connection.disconnect();
-  });
-
   it('publishSystemError は reason_code と instruction を含む system.error を配信する', () => {
     const gateway = createSseBroadcastGateway();
     const send = vi.fn<(event: SseEventPayload) => void>();

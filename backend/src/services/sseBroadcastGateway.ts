@@ -1,6 +1,5 @@
 import type { ErrorDetail } from 'services/errors.js';
 import type { MonitoringService } from 'services/monitoringService.js';
-import type { RuleHint } from 'services/ruleHintService.js';
 import type { EventLogEntry, GameSnapshot } from 'states/inMemoryGameStore.js';
 
 export type SseEventPayload = {
@@ -34,10 +33,6 @@ export type SseBroadcastGateway = {
   ) => void;
   publishSystemError: (sessionId: string, payload: ErrorDetail) => void;
   publishEventLog: (sessionId: string, entry: EventLogEntry) => void;
-  publishRuleHint: (
-    sessionId: string,
-    payload: { stateVersion: string; hint: RuleHint },
-  ) => void;
 };
 
 const MAX_EVENT_HISTORY = 100;
@@ -87,24 +82,6 @@ const createSystemErrorEvent = (
   data: JSON.stringify({
     session_id: sessionId,
     error: payload,
-  }),
-});
-
-const createRuleHintEvent = (
-  sessionId: string,
-  payload: { stateVersion: string; hint: RuleHint },
-): SseEventPayload => ({
-  id: `rule-hint:${payload.stateVersion}`,
-  event: 'rule.hint',
-  data: JSON.stringify({
-    session_id: sessionId,
-    state_version: payload.stateVersion,
-    hint: {
-      text: payload.hint.text,
-      emphasis: payload.hint.emphasis,
-      turn: payload.hint.turn,
-      generated_at: payload.hint.generatedAt,
-    },
   }),
 });
 
@@ -278,19 +255,11 @@ export const createSseBroadcastGateway = (
     broadcast(sessionId, event, { remember: false });
   };
 
-  const publishRuleHint = (
-    sessionId: string,
-    payload: { stateVersion: string; hint: RuleHint },
-  ) => {
-    broadcast(sessionId, createRuleHintEvent(sessionId, payload));
-  };
-
   return {
     connect,
     publishStateDelta,
     publishStateFinal,
     publishSystemError,
     publishEventLog,
-    publishRuleHint,
   };
 };

@@ -4,7 +4,6 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import type { ApiError } from '~/types/apiError';
 import { type SseEvent, useSse } from '~/composables/useSse';
 import { generateCommandId, sendAction } from '~/utils/actionSender';
-import { type RuleHint, fetchHint } from '~/utils/hintFetcher';
 import { joinSession } from '~/utils/joinFetcher';
 import { startRematch } from '~/utils/rematchFetcher';
 import { type GameResults, fetchResults } from '~/utils/resultsFetcher';
@@ -56,15 +55,6 @@ const error = ref<ApiError | null>(null);
 /** アクション送信中フラグ */
 const isActionSubmitting = ref(false);
 
-/** ヒント情報 */
-const hint = ref<RuleHint | null>(null);
-
-/** ヒント表示フラグ */
-const isHintVisible = ref(false);
-
-/** ヒントローディング状態 */
-const isHintLoading = ref(false);
-
 /** 結果情報 */
 const results = ref<GameResults | null>(null);
 
@@ -83,9 +73,6 @@ const handleSseEvent = (event: SseEvent): void => {
       gameState.value = data.state;
       stateVersion.value = data.state_version;
 
-      // ヒント再取得（手番が回ったときなど）
-      void loadHint();
-
       break;
     }
     case 'state.final': {
@@ -100,12 +87,6 @@ const handleSseEvent = (event: SseEvent): void => {
       if (gameState.value !== null) {
         gameState.value = { ...gameState.value, phase: 'completed' };
       }
-
-      break;
-    }
-    case 'rule.hint': {
-      const data = event.data as { hint: RuleHint };
-      hint.value = data.hint;
 
       break;
     }
@@ -166,9 +147,6 @@ const loadInitialState = async (): Promise<void> => {
     // SSE 接続を開始
     connectSse(sessionId.value);
 
-    // ヒントを取得
-    void loadHint();
-
     // 完了状態なら結果を取得
     if (result.data.state.phase === 'completed') {
       void loadResults();
@@ -178,20 +156,6 @@ const loadInitialState = async (): Promise<void> => {
   }
 
   isLoading.value = false;
-};
-
-/** ヒントを取得 */
-const loadHint = async (): Promise<void> => {
-  if (sessionId.value === '') return;
-
-  isHintLoading.value = true;
-  const result = await fetchHint(sessionId.value);
-
-  if (result.success) {
-    hint.value = result.data.hint;
-  }
-
-  isHintLoading.value = false;
 };
 
 /** 結果を取得 */
@@ -258,11 +222,6 @@ const handleTakeCard = () => {
   void handleAction('takeCard');
 };
 
-/** ヒント表示トグル */
-const handleHintToggle = () => {
-  isHintVisible.value = !isHintVisible.value;
-};
-
 /**
  * 再戦ハンドラ（同じセッション内で新しいゲームを開始）
  */
@@ -279,9 +238,6 @@ const handleRematch = async (): Promise<void> => {
     gameState.value = result.data.state;
     stateVersion.value = result.data.state_version;
     results.value = null;
-
-    // ヒントを再取得
-    void loadHint();
   } else {
     error.value = { code: result.code, status: result.status };
   }
@@ -684,16 +640,6 @@ watch(sessionId, (newSessionId, oldSessionId) => {
           :my-chips="myChips"
           @place-chip="() => handlePlaceChip()"
           @take-card="() => handleTakeCard()"
-        />
-
-        <!-- ヒントパネル -->
-        <HintPanel
-          class="mt-6"
-          :hint="hint"
-          :is-loading="isHintLoading"
-          :is-visible="isHintVisible"
-          :player-map="playerMap"
-          @toggle="() => handleHintToggle()"
         />
       </template>
 

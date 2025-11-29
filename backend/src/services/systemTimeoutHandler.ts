@@ -1,6 +1,5 @@
 import { publishStateEvents } from 'services/ssePublisher.js';
 import type { MonitoringService } from 'services/monitoringService.js';
-import type { RuleHintService } from 'services/ruleHintService.js';
 import type { SseBroadcastGateway } from 'services/sseBroadcastGateway.js';
 import type { TurnDecisionService } from 'services/turnDecision.js';
 import type {
@@ -12,7 +11,6 @@ export type TimeoutCommandHandlerDependencies = {
   store: InMemoryGameStore;
   turnService: TurnDecisionService;
   sseGateway?: SseBroadcastGateway;
-  ruleHintService?: RuleHintService;
   generateCommandId?: (snapshot: GameSnapshot) => string;
   monitoring?: MonitoringService;
 };
@@ -68,10 +66,6 @@ export const createTimeoutCommandHandler = (
 
       if (dependencies.sseGateway) {
         eventOptions.sseGateway = dependencies.sseGateway;
-      }
-
-      if (dependencies.ruleHintService) {
-        eventOptions.ruleHints = dependencies.ruleHintService;
       }
 
       publishStateEvents(eventOptions, result.snapshot, result.version);

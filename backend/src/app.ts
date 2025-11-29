@@ -6,7 +6,6 @@ import { sessionsListGetApp } from 'routes/sessions/index.get.js';
 import { sessionPostApp } from 'routes/sessions/index.post.js';
 import { createSessionDepsMiddleware } from 'routes/sessions/types.js';
 import { sessionActionsPostApp } from 'routes/sessions/{sessionId}/actions.post.js';
-import { sessionHintGetApp } from 'routes/sessions/{sessionId}/hint.get.js';
 import { sessionGetApp } from 'routes/sessions/{sessionId}/index.get.js';
 import { sessionJoinPostApp } from 'routes/sessions/{sessionId}/join.post.js';
 import { logsExportCsvGetApp } from 'routes/sessions/{sessionId}/logs/export.csv.get.js';
@@ -24,10 +23,6 @@ import {
   type MonitoringService,
   createMonitoringService,
 } from 'services/monitoringService.js';
-import {
-  type RuleHintService,
-  createRuleHintService,
-} from 'services/ruleHintService.js';
 import {
   type SseBroadcastGateway,
   createSseBroadcastGateway,
@@ -53,7 +48,6 @@ export type CreateAppOptions = {
   turnTimeoutMs?: number;
   sseGateway?: SseBroadcastGateway;
   eventLogService?: EventLogService;
-  ruleHintService?: RuleHintService;
   monitoring?: MonitoringService;
 };
 
@@ -80,11 +74,6 @@ export const createApp = (options: CreateAppOptions = {}) => {
     options.monitoring ?? createMonitoringService({ log: defaultLogger });
   const sseGateway =
     options.sseGateway ?? createSseBroadcastGateway({ monitoring });
-  const ruleHintService =
-    options.ruleHintService ??
-    createRuleHintService({
-      now,
-    });
   const eventLogService =
     options.eventLogService ??
     createEventLogService({
@@ -118,7 +107,6 @@ export const createApp = (options: CreateAppOptions = {}) => {
       store,
       turnService,
       sseGateway,
-      ruleHintService,
       monitoring,
     });
   }
@@ -132,7 +120,6 @@ export const createApp = (options: CreateAppOptions = {}) => {
     turnTimeoutMs,
     sseGateway,
     eventLogService,
-    ruleHintService,
     monitoring,
   };
 
@@ -150,7 +137,6 @@ export const createApp = (options: CreateAppOptions = {}) => {
     .route('/', sessionsListGetApp)
     .route('/', sessionGetApp)
     .route('/', sessionStateGetApp)
-    .route('/', sessionHintGetApp)
     .route('/', sessionStreamGetApp)
     .route('/', sessionActionsPostApp)
     .route('/', sessionResultsGetApp)

@@ -188,7 +188,6 @@ export const sessionStartPostApp = new OpenAPIHono<SessionEnv>().openapi(
     publishStateEvents(
       {
         sseGateway: deps.sseGateway,
-        ruleHints: deps.ruleHintService,
       },
       updatedEnvelope.snapshot,
       updatedEnvelope.version,

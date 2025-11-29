@@ -81,25 +81,6 @@ export const scoreSummarySchema = z
   })
   .openapi({ description: 'ゲーム終了時の結果サマリー。' });
 
-export const ruleHintSchema = z
-  .object({
-    text: z.string().openapi({
-      description: '現在の状況に基づくヒント本文。',
-    }),
-    emphasis: z.enum(['info', 'warning']).openapi({
-      description: 'ヒントの強調度。warning は注意喚起。',
-    }),
-    turn: z.number().int().min(0).openapi({
-      description: 'ヒントが対象とするターン番号。',
-    }),
-    generated_at: z.string().openapi({
-      description: 'ヒント生成時刻 (ISO8601)。',
-    }),
-  })
-  .openapi({
-    description: 'カードとチップ状況から導かれるルールヘルプ。',
-  });
-
 export const snapshotSchema = z.object({
   sessionId: z.string().openapi({
     description: 'セッションを一意に識別する ID。',

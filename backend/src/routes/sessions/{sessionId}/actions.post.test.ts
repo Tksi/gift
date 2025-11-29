@@ -30,7 +30,6 @@ const createSseGatewayStub = (): SseBroadcastGateway => {
   const publishStateFinal = vi.fn();
   const publishSystemError = vi.fn();
   const publishEventLog = vi.fn();
-  const publishRuleHint = vi.fn();
 
   return {
     connect,
@@ -38,7 +37,6 @@ const createSseGatewayStub = (): SseBroadcastGateway => {
     publishStateFinal,
     publishSystemError,
     publishEventLog,
-    publishRuleHint,
   };
 };
 
