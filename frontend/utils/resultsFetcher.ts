@@ -39,7 +39,6 @@ export type EventLogEntry = {
 export type ResultsSuccessData = {
   session_id: string;
   final_results: GameResults;
-  event_log: EventLogEntry[];
 };
 
 /** 結果取得結果 */
