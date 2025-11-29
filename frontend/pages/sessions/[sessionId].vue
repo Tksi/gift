@@ -540,6 +540,9 @@ watch(sessionId, (newSessionId, oldSessionId) => {
 
         <!-- 参加済み: 待機画面 -->
         <div v-else data-testid="waiting-room">
+          <div class="font-medium mb-2 text-gray-500 text-sm">
+            ルーム #{{ sessionId.slice(0, 8) }}
+          </div>
           <h2 class="font-bold mb-4 text-gray-800 text-lg">
             参加者を待っています...
           </h2>
