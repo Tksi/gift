@@ -110,7 +110,7 @@ const turnHighlightClass = computed((): string => {
         <div
           v-for="(set, index) in cardSets"
           :key="index"
-          class="bg-amber-100 inline-flex px-2 py-0.5 rounded text-amber-900 text-base font-medium"
+          class="bg-amber-100 font-medium inline-flex px-2 py-0.5 rounded text-amber-900 text-base"
           data-testid="card-set"
         >
           <span v-if="set.length === 1">{{ set[0] }}</span>

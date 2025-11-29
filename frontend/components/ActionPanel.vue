@@ -46,7 +46,7 @@ const handleTakeCard = (): void => {
 
 <template>
   <div
-    class="bg-white border border-gray-200 border-t sm:border sm:shadow-none sm:shadow-sm p-2 shadow-[0_-2px_10px_rgba(0,0,0,0.1)] shadow-sm"
+    class="bg-white border border-gray-200 border-t p-2 shadow-[0_-2px_10px_rgba(0,0,0,0.1)] shadow-sm sm:border sm:shadow-none sm:shadow-sm"
   >
     <!-- アクションボタン -->
     <div class="flex gap-2">

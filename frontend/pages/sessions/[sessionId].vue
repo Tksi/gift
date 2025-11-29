@@ -140,8 +140,8 @@ const loadInitialState = async (): Promise<void> => {
       }
     }
 
-    // SSE 接続を開始
-    connectSse(sessionId.value);
+    // SSE 接続を開始（playerIdを渡してロビーからの自動退出を有効化）
+    connectSse(sessionId.value, currentPlayerId.value ?? undefined);
 
     // 完了状態なら結果を取得
     if (result.data.state.phase === 'completed') {
@@ -271,6 +271,10 @@ const handleJoin = async (displayName: string): Promise<void> => {
     // 状態を更新
     gameState.value = result.data.state;
     stateVersion.value = result.data.state_version;
+
+    // SSE を再接続して playerId を含める（切断時の自動退出を有効化）
+    disconnectSse();
+    connectSse(sessionId.value, result.data.player.id);
   } else {
     error.value = { code: result.code, status: result.status };
   }
@@ -434,37 +438,6 @@ watch(sessionId, (newSessionId, oldSessionId) => {
 <template>
   <div class="bg-gray-100 lg:px-8 min-h-screen px-4 py-8 sm:px-6">
     <div class="max-w-4xl mx-auto">
-      <!-- ローディング状態 -->
-      <div
-        v-if="isLoading"
-        class="bg-white flex items-center justify-center min-h-[400px] p-6 rounded-xl shadow-md"
-        data-testid="loading-state"
-      >
-        <div class="flex flex-col gap-3 items-center text-gray-500">
-          <svg
-            class="animate-spin h-8 text-blue-600 w-8"
-            fill="none"
-            viewBox="0 0 24 24"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <circle
-              class="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              stroke-width="4"
-            />
-            <path
-              class="opacity-75"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              fill="currentColor"
-            />
-          </svg>
-          <span>ゲームを読み込み中...</span>
-        </div>
-      </div>
-
       <!-- 待機フェーズ: 参加フォームまたは待機画面 -->
       <div
         v-if="!isLoading && gameState && isWaitingPhase"
@@ -602,7 +575,7 @@ watch(sessionId, (newSessionId, oldSessionId) => {
         <!-- アクションパネル（参加者のみ表示） -->
         <ActionPanel
           v-if="!isSpectator"
-          class="bottom-0 fixed left-0 sm:mt-6 sm:relative sm:rounded-lg right-0 rounded-none z-10"
+          class="bottom-0 fixed left-0 right-0 rounded-none sm:mt-6 sm:relative sm:rounded-lg z-10"
           :is-my-turn="isMyTurn"
           :is-submitting="isActionSubmitting"
           :my-chips="myChips"

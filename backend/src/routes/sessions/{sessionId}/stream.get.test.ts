@@ -280,4 +280,177 @@ describe('GET /sessions/{sessionId}/stream', () => {
       'Verify the identifier or create a new session.',
     );
   });
+
+  it('ロビー状態で player_id 付き接続を切断すると自動的にプレイヤーが削除される', async () => {
+    const app = createApp({
+      now: () => '2025-01-01T00:00:00.000Z',
+      generateSessionId: () => 'session-disconnect-test',
+    });
+
+    // セッション作成
+    const createResponse = await app.request('/sessions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ max_players: 3 }),
+    });
+    const createPayload = (await createResponse.json()) as SessionResponse;
+    const sessionId = createPayload.session_id;
+
+    // プレイヤー 2 人参加
+    await app.request(`/sessions/${sessionId}/join`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        player_id: 'alice',
+        display_name: 'Alice',
+      }),
+    });
+
+    await app.request(`/sessions/${sessionId}/join`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        player_id: 'bob',
+        display_name: 'Bob',
+      }),
+    });
+
+    // alice が player_id 付きで SSE 接続
+    const response = await app.request(
+      `/sessions/${sessionId}/stream?player_id=alice`,
+    );
+
+    expect(response.status).toBe(200);
+
+    const body = response.body;
+    expect(body).not.toBeNull();
+
+    if (!body) {
+      return;
+    }
+
+    const reader = createSseEventReader(body);
+
+    // 履歴からのリプレイイベントをすべて受信（alice 参加、bob 参加の 2 つ）
+    let latestData: SessionResponse | null = null;
+
+    for (let i = 0; i < 2; i++) {
+      const event = await readNextDataEvent(reader);
+
+      if (event?.event === 'state.delta') {
+        latestData = JSON.parse(event.data) as SessionResponse;
+      }
+    }
+
+    // 最新状態で alice と bob が参加済み
+    expect(latestData).not.toBeNull();
+    expect(latestData?.state.players).toHaveLength(2);
+
+    // SSE 接続を切断
+    await reader.cancel();
+
+    // 少し待機してから状態を確認（非同期処理の完了を待つ）
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // 状態を確認（alice が削除されているはず）
+    const stateResponse = await app.request(`/sessions/${sessionId}/state`);
+    const statePayload = (await stateResponse.json()) as SessionResponse;
+
+    expect(statePayload.state.players).toHaveLength(1);
+    expect(statePayload.state.players[0]?.id).toBe('bob');
+  });
+
+  it('ゲーム開始後の切断ではプレイヤーは削除されない', async () => {
+    const { app, session } = await createSession();
+
+    // alice が player_id 付きで SSE 接続
+    const response = await app.request(
+      `/sessions/${session.session_id}/stream?player_id=alice`,
+    );
+
+    expect(response.status).toBe(200);
+
+    const body = response.body;
+    expect(body).not.toBeNull();
+
+    if (!body) {
+      return;
+    }
+
+    const reader = createSseEventReader(body);
+
+    // イベントを 1 つ受信
+    await readNextDataEvent(reader);
+
+    // SSE 接続を切断
+    await reader.cancel();
+
+    // 少し待機
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // 状態を確認（プレイヤーは削除されていないはず）
+    const stateResponse = await app.request(
+      `/sessions/${session.session_id}/state`,
+    );
+    const statePayload = (await stateResponse.json()) as SessionResponse;
+
+    expect(statePayload.state.players).toHaveLength(2);
+    expect(statePayload.state.players.some((p) => p.id === 'alice')).toBe(true);
+  });
+
+  it('player_id なしの接続切断ではプレイヤーは削除されない', async () => {
+    const app = createApp({
+      now: () => '2025-01-01T00:00:00.000Z',
+      generateSessionId: () => 'session-no-player-id',
+    });
+
+    // セッション作成
+    const createResponse = await app.request('/sessions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ max_players: 2 }),
+    });
+    const createPayload = (await createResponse.json()) as SessionResponse;
+    const sessionId = createPayload.session_id;
+
+    // プレイヤー参加
+    await app.request(`/sessions/${sessionId}/join`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        player_id: 'alice',
+        display_name: 'Alice',
+      }),
+    });
+
+    // player_id なしで SSE 接続
+    const response = await app.request(`/sessions/${sessionId}/stream`);
+
+    expect(response.status).toBe(200);
+
+    const body = response.body;
+    expect(body).not.toBeNull();
+
+    if (!body) {
+      return;
+    }
+
+    const reader = createSseEventReader(body);
+
+    // イベントを 1 つ受信
+    await readNextDataEvent(reader);
+
+    // SSE 接続を切断
+    await reader.cancel();
+
+    // 少し待機
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // 状態を確認（プレイヤーは削除されていないはず）
+    const stateResponse = await app.request(`/sessions/${sessionId}/state`);
+    const statePayload = (await stateResponse.json()) as SessionResponse;
+
+    expect(statePayload.state.players).toHaveLength(1);
+    expect(statePayload.state.players[0]?.id).toBe('alice');
+  });
 });

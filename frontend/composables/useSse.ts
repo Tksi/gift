@@ -41,7 +41,7 @@ export type UseSseOptions = {
  */
 export type UseSseReturn = {
   /** SSE 接続を開始 */
-  connect: (sessionId: string) => void;
+  connect: (sessionId: string, playerId?: string) => void;
   /** SSE 接続を切断 */
   disconnect: () => void;
   /** 接続状態 */
@@ -94,6 +94,7 @@ export const useSse = (options: UseSseOptions): UseSseReturn => {
 
   let eventSource: EventSource | null = null;
   let currentSessionId: string | null = null;
+  let currentPlayerId: string | null = null;
   let retryCount = 0;
   let reconnectTimeoutId: ReturnType<typeof setTimeout> | null = null;
   let wasConnected = false;
@@ -171,7 +172,11 @@ export const useSse = (options: UseSseOptions): UseSseReturn => {
 
     // NOTE: EventSource はブラウザが自動的に Last-Event-ID ヘッダーを送信するため
     // 再接続時に lastEventId を明示的に送る必要はない
-    const url = `${apiBase}/sessions/${sessionId}/stream`;
+    const urlBase = `${apiBase}/sessions/${sessionId}/stream`;
+    const url =
+      currentPlayerId !== null && currentPlayerId.length > 0
+        ? `${urlBase}?player_id=${encodeURIComponent(currentPlayerId)}`
+        : urlBase;
 
     connectionState.value =
       connectionState.value === 'reconnecting' ? 'reconnecting' : 'connecting';
@@ -210,14 +215,16 @@ export const useSse = (options: UseSseOptions): UseSseReturn => {
   /**
    * SSE 接続を開始する
    * @param sessionId - 接続先のセッション ID
+   * @param playerId - 接続するプレイヤー ID（オプション）。指定すると切断時にロビーから自動退出
    */
-  const connect = (sessionId: string) => {
+  const connect = (sessionId: string, playerId?: string) => {
     // sessionId が空の場合は接続しない
     if (!sessionId) {
       return;
     }
 
     currentSessionId = sessionId;
+    currentPlayerId = playerId ?? null;
     wasConnected = false;
     retryCount = 0;
     connectInternal(sessionId);
@@ -238,6 +245,7 @@ export const useSse = (options: UseSseOptions): UseSseReturn => {
     }
 
     currentSessionId = null;
+    currentPlayerId = null;
     connectionState.value = 'disconnected';
   };
 

@@ -90,6 +90,28 @@ describe('useSse', () => {
       );
     });
 
+    it('playerId を指定すると URL に player_id クエリパラメータが含まれる', () => {
+      const onEvent = vi.fn();
+      const { connect } = useSse({ apiBase, onEvent });
+
+      connect('session-123', 'alice');
+
+      expect(mockEventSourceConstructor).toHaveBeenCalledWith(
+        'http://localhost:3000/sessions/session-123/stream?player_id=alice',
+      );
+    });
+
+    it('playerId に特殊文字が含まれる場合はエンコードされる', () => {
+      const onEvent = vi.fn();
+      const { connect } = useSse({ apiBase, onEvent });
+
+      connect('session-123', 'user&name=test');
+
+      expect(mockEventSourceConstructor).toHaveBeenCalledWith(
+        'http://localhost:3000/sessions/session-123/stream?player_id=user%26name%3Dtest',
+      );
+    });
+
     it('connect 後に接続状態が connecting になる', () => {
       const onEvent = vi.fn();
       const { connect, connectionState } = useSse({ apiBase, onEvent });

@@ -9,13 +9,16 @@ export type SseEventPayload = {
 
 type SseConnection = {
   sessionId: string;
+  playerId: string | undefined;
   send: (event: SseEventPayload) => void;
 };
 
 type ConnectOptions = {
   sessionId: string;
+  playerId: string | undefined;
   lastEventId?: string;
   send: (event: SseEventPayload) => void;
+  onDisconnect?: (sessionId: string, playerId: string | undefined) => void;
 };
 
 export type SseBroadcastGateway = {
@@ -168,6 +171,7 @@ export const createSseBroadcastGateway = (): SseBroadcastGateway => {
       connections.get(options.sessionId) ?? new Set<SseConnection>();
     const connection: SseConnection = {
       sessionId: options.sessionId,
+      playerId: options.playerId,
       send: options.send,
     };
 
@@ -188,6 +192,8 @@ export const createSseBroadcastGateway = (): SseBroadcastGateway => {
       if (current.size === 0) {
         connections.delete(options.sessionId);
       }
+
+      options.onDisconnect?.(options.sessionId, options.playerId);
     };
 
     return { disconnect };

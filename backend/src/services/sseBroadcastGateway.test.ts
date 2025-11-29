@@ -51,6 +51,7 @@ describe('createSseBroadcastGateway', () => {
 
     const connection = gateway.connect({
       sessionId: 'session-1',
+      playerId: undefined,
       send,
     });
 
@@ -78,6 +79,7 @@ describe('createSseBroadcastGateway', () => {
 
     const connection = gateway.connect({
       sessionId: snapshot.sessionId,
+      playerId: undefined,
       lastEventId: 'state:version-1',
       send,
     });
@@ -98,6 +100,7 @@ describe('createSseBroadcastGateway', () => {
 
     const connection = gateway.connect({
       sessionId: 'session-error',
+      playerId: undefined,
       send,
     });
 
