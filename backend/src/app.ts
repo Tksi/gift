@@ -11,6 +11,7 @@ import { sessionGetApp } from 'routes/sessions/{sessionId}/index.get.js';
 import { sessionJoinPostApp } from 'routes/sessions/{sessionId}/join.post.js';
 import { logsExportCsvGetApp } from 'routes/sessions/{sessionId}/logs/export.csv.get.js';
 import { logsExportJsonGetApp } from 'routes/sessions/{sessionId}/logs/export.json.get.js';
+import { sessionRematchPostApp } from 'routes/sessions/{sessionId}/rematch.post.js';
 import { sessionResultsGetApp } from 'routes/sessions/{sessionId}/results.get.js';
 import { sessionStartPostApp } from 'routes/sessions/{sessionId}/start.post.js';
 import { sessionStateGetApp } from 'routes/sessions/{sessionId}/state.get.js';
@@ -155,6 +156,7 @@ export const createApp = (options: CreateAppOptions = {}) => {
     .route('/', sessionResultsGetApp)
     .route('/', sessionJoinPostApp)
     .route('/', sessionStartPostApp)
+    .route('/', sessionRematchPostApp)
     .route('/', logsExportCsvGetApp)
     .route('/', logsExportJsonGetApp)
     .doc('/doc', {

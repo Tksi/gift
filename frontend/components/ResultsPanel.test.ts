@@ -235,8 +235,8 @@ describe('ResultsPanel', () => {
     });
   });
 
-  describe('新しいゲームボタン', () => {
-    it('新しいゲームを開始するボタンが表示される', () => {
+  describe('再戦ボタン', () => {
+    it('再戦するボタンが表示される', () => {
       const results = createTestResults();
       const playerMap = createTestPlayerMap();
       const wrapper = mount(ResultsPanel, {
@@ -246,12 +246,12 @@ describe('ResultsPanel', () => {
         },
       });
 
-      const newGameButton = wrapper.find('[data-testid="new-game-button"]');
-      expect(newGameButton.exists()).toBe(true);
-      expect(newGameButton.text()).toContain('新しいゲーム');
+      const rematchButton = wrapper.find('[data-testid="rematch-button"]');
+      expect(rematchButton.exists()).toBe(true);
+      expect(rematchButton.text()).toContain('再戦する');
     });
 
-    it('ボタンクリックで newGame イベントが発火する', async () => {
+    it('ボタンクリックで rematch イベントが発火する', async () => {
       const results = createTestResults();
       const playerMap = createTestPlayerMap();
       const wrapper = mount(ResultsPanel, {
@@ -261,15 +261,31 @@ describe('ResultsPanel', () => {
         },
       });
 
-      const newGameButton = wrapper.find('[data-testid="new-game-button"]');
-      await newGameButton.trigger('click');
+      const rematchButton = wrapper.find('[data-testid="rematch-button"]');
+      await rematchButton.trigger('click');
 
-      expect(wrapper.emitted('newGame')).toHaveLength(1);
+      expect(wrapper.emitted('rematch')).toHaveLength(1);
+    });
+
+    it('送信中はボタンが無効化され、ローディングテキストが表示される', () => {
+      const results = createTestResults();
+      const playerMap = createTestPlayerMap();
+      const wrapper = mount(ResultsPanel, {
+        props: {
+          results,
+          playerMap,
+          isRematchSubmitting: true,
+        },
+      });
+
+      const rematchButton = wrapper.find('[data-testid="rematch-button"]');
+      expect(rematchButton.attributes('disabled')).toBeDefined();
+      expect(rematchButton.text()).toContain('再戦開始中...');
     });
   });
 
   describe('タッチ操作対応', () => {
-    it('新しいゲームボタンは最小 44px の高さを持つ', () => {
+    it('再戦ボタンは最小 44px の高さを持つ', () => {
       const results = createTestResults();
       const playerMap = createTestPlayerMap();
       const wrapper = mount(ResultsPanel, {
@@ -279,9 +295,9 @@ describe('ResultsPanel', () => {
         },
       });
 
-      const newGameButton = wrapper.find('[data-testid="new-game-button"]');
+      const rematchButton = wrapper.find('[data-testid="rematch-button"]');
       // min-h-11 (44px) クラスが適用されていることを確認
-      expect(newGameButton.classes()).toContain('min-h-11');
+      expect(rematchButton.classes()).toContain('min-h-11');
     });
   });
 });

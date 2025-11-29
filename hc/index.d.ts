@@ -3631,6 +3631,100 @@ declare const createApp: (options?: CreateAppOptions) => Hono$1<SessionEnv, Merg
     };
   };
 }, "/"> & MergeSchemaPath<{
+  "/sessions/:sessionId/rematch": {
+    $post: {
+      input: {
+        param: {
+          sessionId: string;
+        };
+      };
+      output: {
+        error: {
+          code: string;
+          message: string;
+          reason_code: string;
+          instruction: string;
+        };
+      };
+      outputFormat: "json";
+      status: 422;
+    } | {
+      input: {
+        param: {
+          sessionId: string;
+        };
+      };
+      output: {
+        session_id: string;
+        state_version: string;
+        state: {
+          sessionId: string;
+          phase: "waiting" | "setup" | "running" | "completed";
+          deck: number[];
+          discardHidden: number[];
+          playerOrder: string[];
+          rngSeed: string;
+          players: {
+            id: string;
+            displayName: string;
+          }[];
+          chips: {
+            [x: string]: number;
+          };
+          hands: {
+            [x: string]: number[];
+          };
+          centralPot: number;
+          turnState: {
+            turn: number;
+            currentPlayerId: string;
+            currentPlayerIndex: number;
+            cardInCenter: number | null;
+            awaitingAction: boolean;
+            deadline?: string | null | undefined;
+          };
+          createdAt: string;
+          updatedAt: string;
+          finalResults: {
+            placements: {
+              rank: number;
+              playerId: string;
+              score: number;
+              chipsRemaining: number;
+              cards: number[];
+              cardSets: number[][];
+            }[];
+            tieBreak: {
+              reason: "chipCount";
+              tiedScore: number;
+              contenders: string[];
+              winner: string | null;
+            } | null;
+          } | null;
+          maxPlayers: number;
+        };
+      };
+      outputFormat: "json";
+      status: 200;
+    } | {
+      input: {
+        param: {
+          sessionId: string;
+        };
+      };
+      output: {
+        error: {
+          code: string;
+          message: string;
+          reason_code: string;
+          instruction: string;
+        };
+      };
+      outputFormat: "json";
+      status: 404;
+    };
+  };
+}, "/"> & MergeSchemaPath<{
   "/sessions/:sessionId/start": {
     $post: {
       input: {

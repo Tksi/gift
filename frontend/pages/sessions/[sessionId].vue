@@ -5,6 +5,7 @@ import { type SseEvent, useSse } from '~/composables/useSse';
 import { generateCommandId, sendAction } from '~/utils/actionSender';
 import { type RuleHint, fetchHint } from '~/utils/hintFetcher';
 import { joinSession } from '~/utils/joinFetcher';
+import { startRematch } from '~/utils/rematchFetcher';
 import { type GameResults, fetchResults } from '~/utils/resultsFetcher';
 import { startGame } from '~/utils/startFetcher';
 import {
@@ -14,7 +15,6 @@ import {
 } from '~/utils/stateFetcher';
 
 const route = useRoute();
-const router = useRouter();
 const config = useRuntimeConfig();
 
 /** セッション ID */
@@ -45,6 +45,9 @@ const isJoinSubmitting = ref(false);
 
 /** ゲーム開始送信中フラグ */
 const isStartSubmitting = ref(false);
+
+/** 再戦送信中フラグ */
+const isRematchSubmitting = ref(false);
 
 /** エラー情報 */
 const error = ref<ApiError | null>(null);
@@ -259,9 +262,30 @@ const handleHintToggle = () => {
   isHintVisible.value = !isHintVisible.value;
 };
 
-/** 新しいゲームを開始 */
-const handleNewGame = () => {
-  void router.push('/');
+/**
+ * 再戦ハンドラ（同じセッション内で新しいゲームを開始）
+ */
+const handleRematch = async (): Promise<void> => {
+  if (sessionId.value === '' || isRematchSubmitting.value) return;
+
+  isRematchSubmitting.value = true;
+  error.value = null;
+
+  const result = await startRematch(sessionId.value);
+
+  if (result.success) {
+    // 状態を更新（結果をクリア）
+    gameState.value = result.data.state;
+    stateVersion.value = result.data.state_version;
+    results.value = null;
+
+    // ヒントを再取得
+    void loadHint();
+  } else {
+    error.value = { code: result.code, status: result.status };
+  }
+
+  isRematchSubmitting.value = false;
 };
 
 /** エラー非表示 */
@@ -615,9 +639,10 @@ watch(sessionId, (newSessionId, oldSessionId) => {
       <!-- 結果画面 -->
       <ResultsPanel
         v-else-if="isCompleted && results"
+        :is-rematch-submitting="isRematchSubmitting"
         :player-map="playerMap"
         :results="results"
-        @new-game="() => handleNewGame()"
+        @rematch="() => handleRematch()"
       />
     </div>
 
