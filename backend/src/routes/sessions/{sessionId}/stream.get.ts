@@ -109,9 +109,8 @@ export const sessionStreamGetApp = new OpenAPIHono<SessionEnv>().openapi(
           });
         });
       },
-      async (err, stream) => {
+      async (_err, stream) => {
         cleanup();
-        console.error(err);
         await stream.write(': error\n\n');
       },
     );

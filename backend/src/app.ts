@@ -14,10 +14,6 @@ import { sessionStartPostApp } from 'routes/sessions/{sessionId}/start.post.js';
 import { sessionStateGetApp } from 'routes/sessions/{sessionId}/state.get.js';
 import { sessionStreamGetApp } from 'routes/sessions/{sessionId}/stream.get.js';
 import {
-  type MonitoringService,
-  createMonitoringService,
-} from 'services/monitoringService.js';
-import {
   type SseBroadcastGateway,
   createSseBroadcastGateway,
 } from 'services/sseBroadcastGateway.js';
@@ -40,15 +36,6 @@ export type CreateAppOptions = {
   timerSupervisor?: TimerSupervisor;
   turnTimeoutMs?: number;
   sseGateway?: SseBroadcastGateway;
-  monitoring?: MonitoringService;
-};
-
-/**
- * console.info で構造化ログを出力するデフォルトロガー。
- * @param entry ログエントリ。
- */
-const defaultLogger = (entry: Record<string, unknown>): void => {
-  console.info(JSON.stringify(entry));
 };
 
 /**
@@ -60,10 +47,7 @@ export const createApp = (options: CreateAppOptions = {}) => {
   const now = options.now ?? (() => new Date().toISOString());
   const generateSessionId = options.generateSessionId ?? (() => randomUUID());
   const turnTimeoutMs = options.turnTimeoutMs ?? 45_000;
-  const monitoring =
-    options.monitoring ?? createMonitoringService({ log: defaultLogger });
-  const sseGateway =
-    options.sseGateway ?? createSseBroadcastGateway({ monitoring });
+  const sseGateway = options.sseGateway ?? createSseBroadcastGateway();
   const timerSupervisor =
     options.timerSupervisor ??
     createTimerSupervisor({
@@ -71,7 +55,6 @@ export const createApp = (options: CreateAppOptions = {}) => {
       now: () => Date.now(),
       schedule: (handler, delay) => setTimeout(handler, delay),
       cancel: (handle) => clearTimeout(handle),
-      monitoring,
     });
 
   const turnService = createTurnDecisionService({
@@ -79,7 +62,6 @@ export const createApp = (options: CreateAppOptions = {}) => {
     now,
     timerSupervisor,
     turnTimeoutMs,
-    monitoring,
   });
 
   const sessionDependencies: SessionRouteDependencies = {
@@ -90,7 +72,6 @@ export const createApp = (options: CreateAppOptions = {}) => {
     timerSupervisor,
     turnTimeoutMs,
     sseGateway,
-    monitoring,
   };
 
   timerSupervisor.restore();

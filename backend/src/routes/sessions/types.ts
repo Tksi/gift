@@ -1,5 +1,4 @@
 import { createMiddleware } from 'hono/factory';
-import type { MonitoringService } from 'services/monitoringService.js';
 import type { SseBroadcastGateway } from 'services/sseBroadcastGateway.js';
 import type { TimerSupervisor } from 'services/timerSupervisor.js';
 import type { TurnDecisionService } from 'services/turnDecision.js';
@@ -13,7 +12,6 @@ export type SessionRouteDependencies = {
   timerSupervisor: TimerSupervisor;
   turnTimeoutMs: number;
   sseGateway: SseBroadcastGateway;
-  monitoring?: MonitoringService;
 };
 
 /**

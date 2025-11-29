@@ -12,7 +12,6 @@ import {
   type TimerSupervisor,
   calculateTurnDeadline,
 } from 'services/timerSupervisor.js';
-import type { MonitoringService } from 'services/monitoringService.js';
 import type {
   GameSnapshot,
   InMemoryGameStore,
@@ -33,7 +32,6 @@ export type TurnDecisionDependencies = {
   now: () => string;
   timerSupervisor: TimerSupervisor;
   turnTimeoutMs: number;
-  monitoring?: MonitoringService;
 };
 
 export type TurnDecisionResult = {
@@ -242,129 +240,81 @@ export const createTurnDecisionService = (
   const applyCommand = async (
     input: TurnCommandInput,
   ): Promise<TurnDecisionResult> => {
-    const startTime = Date.now();
     const envelope = ensureSessionEnvelope(dependencies.store, input.sessionId);
-    const mutexStartTime = Date.now();
 
-    try {
-      const result = await envelope.mutex.runExclusive(() => {
-        const mutexWaitMs = Date.now() - mutexStartTime;
-        dependencies.monitoring?.logMutexWait({
-          sessionId: input.sessionId,
-          waitMs: mutexWaitMs,
-        });
+    const result = await envelope.mutex.runExclusive(() => {
+      const current = ensureSessionEnvelope(
+        dependencies.store,
+        input.sessionId,
+      );
 
-        const current = ensureSessionEnvelope(
-          dependencies.store,
-          input.sessionId,
-        );
-
-        if (
-          dependencies.store.hasProcessedCommand(
-            input.sessionId,
-            input.commandId,
-          )
-        ) {
-          return {
-            snapshot: current.snapshot,
-            version: current.version,
-          };
-        }
-
-        if (input.expectedVersion !== current.version) {
-          throw createError(
-            'STATE_VERSION_MISMATCH',
-            409,
-            'State version does not match the latest snapshot.',
-          );
-        }
-
-        const snapshot = cloneSnapshot(current.snapshot);
-        ensureActionAllowed(snapshot, input);
-
-        applyAction(snapshot, input);
-
-        if (snapshot.phase === 'setup') {
-          snapshot.phase = 'running';
-        }
-
-        const timestamp = dependencies.now();
-        snapshot.updatedAt = timestamp;
-        updateTurnDeadline(snapshot, timestamp, dependencies.turnTimeoutMs);
-
-        if (
-          snapshot.finalResults === null &&
-          snapshot.phase !== 'completed' &&
-          isGameCompleted(snapshot)
-        ) {
-          snapshot.phase = 'completed';
-          const finalSummary = calculateScoreSummary(snapshot);
-          snapshot.finalResults = finalSummary;
-          snapshot.turnState.deadline = null;
-        }
-
-        const saved = dependencies.store.saveSnapshot(snapshot);
-        dependencies.store.markCommandProcessed(
-          input.sessionId,
-          input.commandId,
-        );
-
-        const next = saved.snapshot.turnState;
-        const nextDeadline = next.deadline;
-
-        if (
-          next.awaitingAction &&
-          nextDeadline !== null &&
-          nextDeadline !== undefined
-        ) {
-          dependencies.timerSupervisor.register(
-            saved.snapshot.sessionId,
-            nextDeadline,
-          );
-        } else {
-          dependencies.timerSupervisor.clear(saved.snapshot.sessionId);
-        }
-
+      if (
+        dependencies.store.hasProcessedCommand(input.sessionId, input.commandId)
+      ) {
         return {
-          snapshot: saved.snapshot,
-          version: saved.version,
+          snapshot: current.snapshot,
+          version: current.version,
         };
-      });
+      }
 
-      const durationMs = Date.now() - startTime;
-      dependencies.monitoring?.logActionProcessing({
-        sessionId: input.sessionId,
-        commandId: input.commandId,
-        action: input.action,
-        playerId: input.playerId,
-        durationMs,
-        result: 'success',
-        version: result.version,
-      });
+      if (input.expectedVersion !== current.version) {
+        throw createError(
+          'STATE_VERSION_MISMATCH',
+          409,
+          'State version does not match the latest snapshot.',
+        );
+      }
 
-      return result;
-    } catch (err) {
-      const durationMs = Date.now() - startTime;
-      const errorCode =
-        err !== null &&
-        typeof err === 'object' &&
-        'code' in err &&
-        typeof err.code === 'string'
-          ? err.code
-          : 'UNKNOWN_ERROR';
+      const snapshot = cloneSnapshot(current.snapshot);
+      ensureActionAllowed(snapshot, input);
 
-      dependencies.monitoring?.logActionProcessing({
-        sessionId: input.sessionId,
-        commandId: input.commandId,
-        action: input.action,
-        playerId: input.playerId,
-        durationMs,
-        result: 'error',
-        errorCode,
-      });
+      applyAction(snapshot, input);
 
-      throw err;
-    }
+      if (snapshot.phase === 'setup') {
+        snapshot.phase = 'running';
+      }
+
+      const timestamp = dependencies.now();
+      snapshot.updatedAt = timestamp;
+      updateTurnDeadline(snapshot, timestamp, dependencies.turnTimeoutMs);
+
+      if (
+        snapshot.finalResults === null &&
+        snapshot.phase !== 'completed' &&
+        isGameCompleted(snapshot)
+      ) {
+        snapshot.phase = 'completed';
+        const finalSummary = calculateScoreSummary(snapshot);
+        snapshot.finalResults = finalSummary;
+        snapshot.turnState.deadline = null;
+      }
+
+      const saved = dependencies.store.saveSnapshot(snapshot);
+      dependencies.store.markCommandProcessed(input.sessionId, input.commandId);
+
+      const next = saved.snapshot.turnState;
+      const nextDeadline = next.deadline;
+
+      if (
+        next.awaitingAction &&
+        nextDeadline !== null &&
+        nextDeadline !== undefined
+      ) {
+        dependencies.timerSupervisor.register(
+          saved.snapshot.sessionId,
+          nextDeadline,
+        );
+      } else {
+        dependencies.timerSupervisor.clear(saved.snapshot.sessionId);
+      }
+
+      return {
+        snapshot: saved.snapshot,
+        version: saved.version,
+      };
+    });
+
+    return result;
   };
 
   return { applyCommand };
