@@ -4,16 +4,21 @@ import { computed } from 'vue';
 /** ゲームフェーズ */
 type GamePhase = 'completed' | 'running' | 'setup' | 'waiting';
 
+const props = defineProps<Props>();
+
+/** 山札の初期枚数（33枚 - 除外9枚） */
+const INITIAL_DECK_SIZE = 24;
+
 type Props = {
   /** 中央のカード番号 (null = カードなし) */
   cardInCenter: number | null;
   /** 中央ポットのチップ数 */
   centralPot: number;
+  /** 山札の残り枚数 */
+  deckCount: number;
   /** ゲームフェーズ */
   phase: GamePhase;
 };
-
-const props = defineProps<Props>();
 
 /** フェーズに応じたボーダーカラークラス */
 const borderColorClass = computed((): string => {
@@ -33,6 +38,27 @@ const borderColorClass = computed((): string => {
     }
   }
 });
+
+/** 山札の残り割合（0〜100） */
+const deckPercentage = computed((): number => {
+  return Math.round((props.deckCount / INITIAL_DECK_SIZE) * 100);
+});
+
+/** SVG 円グラフのストローク dasharray */
+const deckStrokeDasharray = computed((): string => {
+  const circumference = 2 * Math.PI * 16; // r=16 の円周
+  const filled = (deckPercentage.value / 100) * circumference;
+
+  return `${filled} ${circumference}`;
+});
+
+/** 山札残量に応じた色 */
+const deckColorClass = computed((): string => {
+  if (deckPercentage.value > 50) return 'text-emerald-500';
+  if (deckPercentage.value > 25) return 'text-amber-500';
+
+  return 'text-red-500';
+});
 </script>
 
 <template>
@@ -44,12 +70,44 @@ const borderColorClass = computed((): string => {
     <!-- 中央カード表示 -->
     <div class="flex flex-col items-center">
       <!-- カードがある場合 -->
-      <div
-        v-if="cardInCenter !== null"
-        class="bg-gradient-to-br flex font-bold from-amber-100 h-20 items-center justify-center rounded-lg shadow-inner text-3xl text-amber-800 to-amber-50 w-14"
-        data-testid="center-card"
-      >
-        {{ cardInCenter }}
+      <div v-if="cardInCenter !== null" class="relative">
+        <div
+          class="bg-gradient-to-br flex font-bold from-amber-100 h-20 items-center justify-center rounded-lg shadow-inner text-3xl text-amber-800 to-amber-50 w-14"
+          data-testid="center-card"
+        >
+          {{ cardInCenter }}
+        </div>
+        <!-- 右上の円形プログレス（山札残量） -->
+        <div
+          class="-right-2 -top-2 absolute bg-white p-0.5 rounded-full shadow"
+          data-testid="deck-count"
+        >
+          <div class="relative size-6">
+            <svg class="-rotate-90 size-full" viewBox="0 0 40 40">
+              <circle
+                class="text-gray-200"
+                cx="20"
+                cy="20"
+                fill="none"
+                r="16"
+                stroke="currentColor"
+                stroke-width="6"
+              />
+              <circle
+                :class="deckColorClass"
+                cx="20"
+                cy="20"
+                data-testid="deck-progress"
+                fill="none"
+                r="16"
+                stroke="currentColor"
+                :stroke-dasharray="deckStrokeDasharray"
+                stroke-linecap="round"
+                stroke-width="6"
+              />
+            </svg>
+          </div>
+        </div>
       </div>
       <!-- カードがない場合（空の状態） -->
       <div

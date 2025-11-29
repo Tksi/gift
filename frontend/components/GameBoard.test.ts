@@ -10,6 +10,7 @@ describe('GameBoard', () => {
         props: {
           cardInCenter: 15,
           centralPot: 5,
+          deckCount: 20,
           phase: 'running',
         },
       });
@@ -24,6 +25,7 @@ describe('GameBoard', () => {
         props: {
           cardInCenter: null,
           centralPot: 0,
+          deckCount: 24,
           phase: 'running',
         },
       });
@@ -37,6 +39,7 @@ describe('GameBoard', () => {
         props: {
           cardInCenter: null,
           centralPot: 0,
+          deckCount: 24,
           phase: 'running',
         },
       });
@@ -46,12 +49,85 @@ describe('GameBoard', () => {
     });
   });
 
+  describe('山札プログレス表示', () => {
+    it('中央カードがある場合、山札残量の円形プログレスを表示する', () => {
+      const wrapper = mount(GameBoard, {
+        props: {
+          cardInCenter: 15,
+          centralPot: 5,
+          deckCount: 20,
+          phase: 'running',
+        },
+      });
+
+      const deckDisplay = wrapper.find('[data-testid="deck-count"]');
+      expect(deckDisplay.exists()).toBe(true);
+    });
+
+    it('中央カードがない場合、山札プログレスは表示されない', () => {
+      const wrapper = mount(GameBoard, {
+        props: {
+          cardInCenter: null,
+          centralPot: 0,
+          deckCount: 24,
+          phase: 'running',
+        },
+      });
+
+      const deckDisplay = wrapper.find('[data-testid="deck-count"]');
+      expect(deckDisplay.exists()).toBe(false);
+    });
+
+    it('山札が50%以上残っている場合は緑色で表示する', () => {
+      const wrapper = mount(GameBoard, {
+        props: {
+          cardInCenter: 15,
+          centralPot: 5,
+          deckCount: 20, // 20/24 = 83%
+          phase: 'running',
+        },
+      });
+
+      const progress = wrapper.find('[data-testid="deck-progress"]');
+      expect(progress.classes()).toContain('text-emerald-500');
+    });
+
+    it('山札が25%〜50%の場合は黄色で表示する', () => {
+      const wrapper = mount(GameBoard, {
+        props: {
+          cardInCenter: 15,
+          centralPot: 5,
+          deckCount: 10, // 10/24 = 42%
+          phase: 'running',
+        },
+      });
+
+      const progress = wrapper.find('[data-testid="deck-progress"]');
+      expect(progress.classes()).toContain('text-amber-500');
+    });
+
+    it('山札が25%以下の場合は赤色で表示する', () => {
+      const wrapper = mount(GameBoard, {
+        props: {
+          cardInCenter: 15,
+          centralPot: 5,
+          deckCount: 5, // 5/24 = 21%
+          phase: 'running',
+        },
+      });
+
+      const progress = wrapper.find('[data-testid="deck-progress"]');
+      expect(progress.classes()).toContain('text-red-500');
+    });
+  });
+
   describe('中央ポット表示', () => {
     it('中央ポットのチップ数をカードの下に表示する', () => {
       const wrapper = mount(GameBoard, {
         props: {
           cardInCenter: 20,
           centralPot: 8,
+          deckCount: 15,
           phase: 'running',
         },
       });
@@ -66,6 +142,7 @@ describe('GameBoard', () => {
         props: {
           cardInCenter: 10,
           centralPot: 0,
+          deckCount: 24,
           phase: 'running',
         },
       });
@@ -82,6 +159,7 @@ describe('GameBoard', () => {
         props: {
           cardInCenter: 15,
           centralPot: 5,
+          deckCount: 20,
           phase: 'running',
         },
       });
@@ -95,6 +173,7 @@ describe('GameBoard', () => {
         props: {
           cardInCenter: null,
           centralPot: 0,
+          deckCount: 24,
           phase: 'setup',
         },
       });
@@ -108,6 +187,7 @@ describe('GameBoard', () => {
         props: {
           cardInCenter: null,
           centralPot: 0,
+          deckCount: 0,
           phase: 'completed',
         },
       });

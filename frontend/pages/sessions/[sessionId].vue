@@ -383,6 +383,9 @@ const cardInCenter = computed((): number | null => {
 /** 中央ポット */
 const centralPot = computed((): number => gameState.value?.centralPot ?? 0);
 
+/** 山札の残り枚数 */
+const deckCount = computed((): number => gameState.value?.deck.length ?? 0);
+
 /** 現在の手番プレイヤー ID */
 const currentTurnPlayerId = computed((): string | null => {
   return gameState.value?.turnState.currentPlayerId ?? null;
@@ -620,6 +623,7 @@ watch(sessionId, (newSessionId, oldSessionId) => {
             <GameBoard
               :card-in-center="cardInCenter"
               :central-pot="centralPot"
+              :deck-count="deckCount"
               :phase="gamePhase"
             />
           </div>
