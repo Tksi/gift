@@ -302,4 +302,55 @@ describe('POST /sessions/{sessionId}/rematch', () => {
     expect(payload.session_id).toBe('session-test');
     expect(payload.state.sessionId).toBe('session-test');
   });
+
+  it('再戦時にプレイヤーの並び順がシャッフルされる', async () => {
+    // 複数回試行して、少なくとも1回は異なる順序になることを確認
+    // 7人プレイヤーで並び順が変わらない確率は1/5040（7!）
+    let orderChanged = false;
+
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const testApp = createTestApp();
+
+      // 参加順序を固定
+      const playerIds = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7'];
+
+      await testApp.app.request('/sessions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ max_players: 7 }),
+      });
+
+      for (const pid of playerIds) {
+        await joinPlayer(testApp.app, 'session-test', pid, pid.toUpperCase());
+      }
+
+      await testApp.app.request('/sessions/session-test/start', {
+        method: 'POST',
+      });
+
+      const beforeSnapshot = testApp.store.getSnapshot('session-test');
+      const orderBefore = beforeSnapshot?.players.map((p) => p.id);
+
+      completeGame(testApp.store, 'session-test');
+
+      const response = await testApp.app.request(
+        '/sessions/session-test/rematch',
+        { method: 'POST' },
+      );
+      const payload = (await response.json()) as SessionResponse;
+      const orderAfter = payload.state.players.map((p) => p.id);
+
+      // players 配列と playerOrder が一致することを確認
+      expect(orderAfter).toEqual(payload.state.playerOrder);
+
+      // 順序が変わったかチェック
+      if (JSON.stringify(orderBefore) !== JSON.stringify(orderAfter)) {
+        orderChanged = true;
+
+        break;
+      }
+    }
+
+    expect(orderChanged).toBe(true);
+  });
 });

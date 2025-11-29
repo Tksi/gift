@@ -21,9 +21,6 @@ type RoomInfo = {
 /** ローディング状態 */
 const isSubmitting = ref(false);
 
-/** ルーム一覧ローディング状態 */
-const isLoadingRooms = ref(true);
-
 /** エラー状態 */
 const apiError = ref<ApiError | null>(null);
 
@@ -34,8 +31,6 @@ const rooms = ref<RoomInfo[]>([]);
  * ルーム一覧を取得
  */
 const loadRooms = async (): Promise<void> => {
-  isLoadingRooms.value = true;
-
   try {
     const response = await fetcher.sessions.$get();
 
@@ -51,8 +46,6 @@ const loadRooms = async (): Promise<void> => {
     }
   } catch {
     // エラーは無視（一覧取得失敗してもルーム作成は可能）
-  } finally {
-    isLoadingRooms.value = false;
   }
 };
 
@@ -168,17 +161,9 @@ onUnmounted(() => {
       <div class="bg-white p-6 rounded-xl shadow-md">
         <h2 class="font-bold mb-4 text-gray-800 text-lg">参加可能なルーム</h2>
 
-        <!-- ローディング -->
-        <div
-          v-if="isLoadingRooms"
-          class="py-4 text-center text-gray-500 text-sm"
-        >
-          読み込み中...
-        </div>
-
         <!-- ルームがない場合 -->
         <div
-          v-else-if="rooms.length === 0"
+          v-if="rooms.length === 0"
           class="py-4 text-center text-gray-500 text-sm"
           data-testid="no-rooms"
         >

@@ -682,9 +682,6 @@ watch(sessionId, (newSessionId, oldSessionId) => {
           @take-card="() => handleTakeCard()"
         />
 
-        <!-- アクションパネル分のスペーサー（スマホ時のみ） -->
-        <div v-if="!isSpectator" class="h-28 lg:hidden" />
-
         <!-- ヒントパネル -->
         <HintPanel
           class="mt-6"

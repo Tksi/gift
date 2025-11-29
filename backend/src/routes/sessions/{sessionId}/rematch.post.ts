@@ -77,10 +77,16 @@ const createRematchSnapshot = (
     hands[player.id] = [];
   }
 
+  // players 配列を playerOrder の順序に並び替え
+  const playerMap = new Map(players.map((p) => [p.id, p]));
+  const orderedPlayers = setup.playerOrder
+    .map((id) => playerMap.get(id))
+    .filter((p): p is PlayerSummary => p !== undefined);
+
   const [activeCard, ...remainingDeck] = setup.deck;
   const firstPlayerIndex = 0;
   const firstPlayerId =
-    setup.playerOrder[firstPlayerIndex] ?? players[0]?.id ?? '';
+    setup.playerOrder[firstPlayerIndex] ?? orderedPlayers[0]?.id ?? '';
   const awaitingAction = activeCard !== undefined;
 
   return {
@@ -90,7 +96,7 @@ const createRematchSnapshot = (
     discardHidden: setup.discardHidden,
     playerOrder: setup.playerOrder,
     rngSeed: setup.rngSeed,
-    players: [...players],
+    players: orderedPlayers,
     chips,
     hands,
     centralPot: 0,
