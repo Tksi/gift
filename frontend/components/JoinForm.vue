@@ -59,7 +59,7 @@ const handleSubmit = (): void => {
 </script>
 
 <template>
-  <div class="bg-white p-6 rounded-xl shadow-md">
+  <div>
     <h2 class="font-bold mb-4 text-gray-900 text-xl">ゲームに参加</h2>
 
     <!-- 参加者状況 -->
@@ -73,12 +73,12 @@ const handleSubmit = (): void => {
 
       <!-- 参加者リスト -->
       <div
-        class="bg-gray-50 min-h-[60px] p-3 rounded-lg"
+        class="bg-gray-50 flex items-center min-h-[60px] p-3 rounded-lg"
         data-testid="player-list"
       >
         <div
           v-if="currentPlayers.length === 0"
-          class="text-center text-gray-400 text-sm"
+          class="text-center text-gray-400 text-sm w-full"
         >
           まだ参加者がいません
         </div>

@@ -1491,14 +1491,6 @@ type Client$1<T$1> = T$1 extends Hono$1<any, infer S, any> ? S extends Record<in
 //#region node_modules/hono/dist/types/client/client.d.ts
 declare const hc: <T$1 extends Hono<any, any, any>>(baseUrl: string, options?: ClientRequestOptions) => UnionToIntersection<Client$1<T$1>>;
 //#endregion
-//#region src/services/errors.d.ts
-type ErrorDetail = {
-  code: string;
-  message: string;
-  reason_code: string;
-  instruction: string;
-};
-//#endregion
 //#region src/services/monitoringService.d.ts
 type ActionProcessingParams = {
   sessionId: string;
@@ -1542,6 +1534,14 @@ type MonitoringService = {
   logTimerEvent: (params: TimerEventParams) => void;
   logExport: (params: ExportParams) => void;
   logSessionEvent: (params: SessionEventParams) => void;
+};
+//#endregion
+//#region src/services/errors.d.ts
+type ErrorDetail = {
+  code: string;
+  message: string;
+  reason_code: string;
+  instruction: string;
 };
 //#endregion
 //#region node_modules/openapi3-ts/dist/model/specification-extension.d.ts
@@ -3378,22 +3378,12 @@ declare const snapshotSchema: ZodObject<{
 type TimerHandle = ReturnType<typeof setTimeout>;
 type GamePhase = output<typeof gamePhaseSchema>;
 type GameSnapshot = output<typeof snapshotSchema>;
-type EventLogEntry = {
-  id: string;
-  turn: number;
-  actor: string;
-  action: string;
-  timestamp: string;
-  chipsDelta?: number;
-  details?: Record<string, unknown>;
-};
 type Mutex = {
   runExclusive: <T$1>(task: () => Promise<T$1> | T$1) => Promise<T$1>;
 };
 type SessionEnvelope = {
   version: string;
   snapshot: GameSnapshot;
-  eventLog: EventLogEntry[];
   processedCommands: Set<string>;
   mutex: Mutex;
   deadlineHandle?: TimerHandle;
@@ -3409,8 +3399,6 @@ type InMemoryGameStore = {
   saveSnapshot: (snapshot: GameSnapshot) => SessionEnvelope;
   getSnapshot: (sessionId: string) => GameSnapshot | undefined;
   getEnvelope: (sessionId: string) => SessionEnvelope | undefined;
-  appendEventLog: (sessionId: string, entries: readonly EventLogEntry[]) => EventLogEntry[];
-  listEventLogAfter: (sessionId: string, afterId?: string) => EventLogEntry[];
   hasProcessedCommand: (sessionId: string, commandId: string) => boolean;
   markCommandProcessed: (sessionId: string, commandId: string) => void;
   listSessions: () => SessionSummary[];
@@ -3440,42 +3428,6 @@ type SseBroadcastGateway = {
   publishStateDelta: (sessionId: string, snapshot: GameSnapshot, version: string) => void;
   publishStateFinal: (sessionId: string, snapshot: GameSnapshot, version: string) => void;
   publishSystemError: (sessionId: string, payload: ErrorDetail) => void;
-  publishEventLog: (sessionId: string, entry: EventLogEntry) => void;
-};
-//#endregion
-//#region src/services/eventLogService.d.ts
-type RecordActionInput = {
-  sessionId: string;
-  turn: number;
-  actor: string;
-  targetPlayer?: string;
-  action: string;
-  card: number | null;
-  centralPotBefore: number;
-  centralPotAfter: number;
-  chipsBefore: number;
-  chipsAfter: number;
-  timestamp: string;
-};
-type RecordSystemEventInput = {
-  sessionId: string;
-  turn: number;
-  actor: string;
-  action: string;
-  timestamp: string;
-  details?: Record<string, unknown>;
-  chipsDelta?: number;
-};
-type ReplayEntriesInput = {
-  sessionId: string;
-  lastEventId?: string;
-  send: (entry: EventLogEntry) => Promise<void> | void;
-};
-type EventLogService = {
-  recordAction: (input: RecordActionInput) => EventLogEntry;
-  recordSystemEvent: (input: RecordSystemEventInput) => EventLogEntry;
-  replayEntries: (input: ReplayEntriesInput) => Promise<void>;
-  isEventLogId: (value: string | null) => boolean;
 };
 //#endregion
 //#region src/services/timerSupervisor.d.ts
@@ -3514,7 +3466,6 @@ type SessionRouteDependencies = {
   timerSupervisor: TimerSupervisor;
   turnTimeoutMs: number;
   sseGateway: SseBroadcastGateway;
-  eventLogService: EventLogService;
   monitoring?: MonitoringService;
 };
 /**
@@ -3534,7 +3485,6 @@ type CreateAppOptions = {
   timerSupervisor?: TimerSupervisor;
   turnTimeoutMs?: number;
   sseGateway?: SseBroadcastGateway;
-  eventLogService?: EventLogService;
   monitoring?: MonitoringService;
 };
 /**
@@ -3542,64 +3492,6 @@ type CreateAppOptions = {
  * @param options ストアやクロック、ID 生成器などを差し替えるためのオプション。
  */
 declare const createApp: (options?: CreateAppOptions) => Hono$1<SessionEnv, MergeSchemaPath<{
-  "/sessions/:sessionId/logs/export.json": {
-    $get: {
-      input: {
-        param: {
-          sessionId: string;
-        };
-      };
-      output: {
-        error: {
-          code: string;
-          message: string;
-          reason_code: string;
-          instruction: string;
-        };
-      };
-      outputFormat: "json";
-      status: 404;
-    } | {
-      input: {
-        param: {
-          sessionId: string;
-        };
-      };
-      output: {};
-      outputFormat: string;
-      status: 200;
-    };
-  };
-}, "/"> & MergeSchemaPath<{
-  "/sessions/:sessionId/logs/export.csv": {
-    $get: {
-      input: {
-        param: {
-          sessionId: string;
-        };
-      };
-      output: {
-        error: {
-          code: string;
-          message: string;
-          reason_code: string;
-          instruction: string;
-        };
-      };
-      outputFormat: "json";
-      status: 404;
-    } | {
-      input: {
-        param: {
-          sessionId: string;
-        };
-      };
-      output: {};
-      outputFormat: string;
-      status: 200;
-    };
-  };
-}, "/"> & MergeSchemaPath<{
   "/sessions/:sessionId/rematch": {
     $post: {
       input: {
@@ -3975,17 +3867,6 @@ declare const createApp: (options?: CreateAppOptions) => Hono$1<SessionEnv, Merg
             winner: string | null;
           } | null;
         };
-        event_log: {
-          id: string;
-          turn: number;
-          actor: string;
-          action: string;
-          timestamp: string;
-          chipsDelta?: number | undefined;
-          details?: {
-            [x: string]: JSONValue;
-          } | undefined;
-        }[];
       };
       outputFormat: "json";
       status: 200;

@@ -102,11 +102,7 @@ const handleSseReconnect = (): void => {
   console.info('SSE reconnected');
 };
 
-const {
-  connect: connectSse,
-  disconnect: disconnectSse,
-  connectionState,
-} = useSse({
+const { connect: connectSse, disconnect: disconnectSse } = useSse({
   apiBase: config.public.apiBase,
   onEvent: handleSseEvent,
   onError: handleSseError,
@@ -438,34 +434,6 @@ watch(sessionId, (newSessionId, oldSessionId) => {
 <template>
   <div class="bg-gray-100 lg:px-8 min-h-screen px-4 py-8 sm:px-6">
     <div class="max-w-4xl mx-auto">
-      <!-- 接続状態インジケーター -->
-      <div
-        class="flex gap-2 items-center justify-end mb-4 text-sm"
-        data-testid="connection-indicator"
-      >
-        <span
-          class="inline-block rounded-full size-2"
-          :class="{
-            'bg-green-500': connectionState === 'connected',
-            'bg-yellow-500':
-              connectionState === 'connecting' ||
-              connectionState === 'reconnecting',
-            'bg-red-500': connectionState === 'disconnected',
-          }"
-        />
-        <span class="text-gray-600">
-          {{
-            connectionState === 'connected'
-              ? '接続中'
-              : connectionState === 'connecting'
-                ? '接続中...'
-                : connectionState === 'reconnecting'
-                  ? '再接続中...'
-                  : '未接続'
-          }}
-        </span>
-      </div>
-
       <!-- ローディング状態 -->
       <div
         v-if="isLoading"
@@ -634,7 +602,7 @@ watch(sessionId, (newSessionId, oldSessionId) => {
         <!-- アクションパネル（参加者のみ表示） -->
         <ActionPanel
           v-if="!isSpectator"
-          class="bottom-0 fixed left-0 lg:mt-6 lg:relative lg:rounded-lg right-0 rounded-none z-10"
+          class="bottom-0 fixed left-0 md:mt-6 md:relative md:rounded-lg right-0 rounded-none z-10"
           :is-my-turn="isMyTurn"
           :is-submitting="isActionSubmitting"
           :my-chips="myChips"
